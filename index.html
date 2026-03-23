@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App (LocalStorage, Full-Width, Sound)</title>
+<title>Barcode Scanner App (Fixed UI, Sound)</title>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
 
@@ -12,13 +12,14 @@ h2 { text-align:center; }
 
 /* Buttons */
 .top-buttons { display:flex; flex-wrap:wrap; gap:10px; margin:15px 0; }
-button { flex:1; padding:12px; border:none; border-radius:10px; font-weight:bold; background:#4CAF50; color:white; }
+button { flex:1; padding:12px; border:none; border-radius:10px; font-weight:bold; background:#4CAF50; color:white; z-index:10000; position:relative; }
 
 /* Scanner */
-#scanner { width:100%; height:400px; border-radius:15px; overflow:hidden; background:black; margin-bottom:10px; }
+#scanner { width:100%; height:400px; border-radius:15px; overflow:hidden; background:black; position:relative; z-index:1; }
+#scanner video { pointer-events: none; } /* allow clicks to pass through video */
 
 /* Modals */
-.modal { display:none; position:fixed; bottom:0; width:100%; background:white; border-radius:20px 20px 0 0; padding:20px; box-shadow:0px -2px 10px rgba(0,0,0,0.2); }
+.modal { display:none; position:fixed; bottom:0; width:100%; background:white; border-radius:20px 20px 0 0; padding:20px; box-shadow:0px -2px 10px rgba(0,0,0,0.2); z-index:9999; }
 
 /* Inputs */
 input { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ccc; }
@@ -89,5 +90,132 @@ let html5QrCode = null;
 let editIndex = null;
 
 // --- SOUND ---
-const beepSound = new Audio("https://www.soundjay.com/button/be
-                            
+const beepSound = new Audio("https://www.soundjay.com/button/beep-07.mp3");
+
+// --- REFRESH ---
+function refreshPage(){ location.reload(); }
+
+// --- SAVE TO LOCALSTORAGE ---
+function saveToStorage(){ localStorage.setItem('products', JSON.stringify(products)); }
+
+// --- FETCH PRODUCTS ---
+function fetchProducts(){ renderProducts(); }
+
+// --- LIST MODAL ---
+function openList(){ fetchProducts(); document.getElementById("listModal").style.display="block"; }
+function closeList(){ document.getElementById("listModal").style.display="none"; }
+
+// --- RENDER PRODUCTS ---
+function renderProducts(){
+  const list = document.getElementById("product-list");
+  list.innerHTML = "";
+  products.forEach((p,i)=>{
+    let li = document.createElement("li");
+    li.innerHTML = `<b>${p.name}</b><br>${p.barcode}<br>₱${p.price} | ₱${p.wholesale}<br>
+      <button class="small-btn" onclick="openEdit(${i})">Edit</button>
+      <button class="small-btn delete-btn" onclick="deleteProduct(${i})">Delete</button>`;
+    list.appendChild(li);
+  });
+}
+
+// --- DELETE PRODUCT ---
+function deleteProduct(index){
+  if(!confirm("Delete this product?")) return;
+  products.splice(index,1);
+  saveToStorage();
+  fetchProducts();
+}
+
+// --- SCANNER ---
+async function startScanner(mode){
+  searchMode = mode;
+  const scannerDiv = document.getElementById("scanner");
+  scannerDiv.innerHTML = "";
+
+  try {
+    if(html5QrCode){ try{ await html5QrCode.stop(); } catch{} html5QrCode=null; }
+    html5QrCode = new Html5Qrcode("scanner");
+
+    const devices = await Html5Qrcode.getCameras();
+    if(!devices.length){ alert("No camera found"); return; }
+
+    let backCamera = devices.find(d=>d.label.toLowerCase().includes("back")) || devices[0];
+
+    await html5QrCode.start(
+      backCamera.id,
+      { fps:10 },  // FULL preview, no qrbox
+      decodedText=>{
+        html5QrCode.stop();
+        currentBarcode = decodedText;
+        document.getElementById("manualBarcode").value = decodedText;
+
+        // --- PLAY SOUND ---
+        beepSound.currentTime = 0;
+        beepSound.play();
+
+        if(searchMode) searchBarcode(decodedText);
+        else openPopup();
+      }
+    );
+
+  } catch(err){ console.error(err); alert("Camera error: "+err); }
+}
+
+// --- ADD PRODUCT ---
+function openPopup(){ document.getElementById("popup").style.display="block"; }
+function closePopup(){ document.getElementById("popup").style.display="none"; }
+
+function saveProduct(){
+  let barcode = currentBarcode || document.getElementById("manualBarcode").value;
+  let name = document.getElementById("prodName").value;
+  let price = document.getElementById("price").value;
+  let wholesale = document.getElementById("wholesale").value;
+
+  if(!barcode||!name){ alert("Missing data"); return; }
+  if(products.find(p=>p.barcode===barcode)){ alert("Product already exists"); return; }
+
+  products.push({ barcode,name,price,wholesale });
+  saveToStorage();
+  closePopup();
+  fetchProducts();
+}
+
+// --- EDIT PRODUCT ---
+function openEdit(i){
+  editIndex=i;
+  let p=products[i];
+  document.getElementById("editName").value=p.name;
+  document.getElementById("editPrice").value=p.price;
+  document.getElementById("editWholesale").value=p.wholesale;
+  closeList();
+  document.getElementById("editModal").style.display="block";
+}
+function closeEdit(){ document.getElementById("editModal").style.display="none"; }
+
+function updateProduct(){
+  products[editIndex].name = document.getElementById("editName").value;
+  products[editIndex].price = document.getElementById("editPrice").value;
+  products[editIndex].wholesale = document.getElementById("editWholesale").value;
+  saveToStorage();
+  closeEdit();
+  fetchProducts();
+  openList();
+}
+
+// --- SEARCH PRODUCT ---
+function searchBarcode(code){
+  let p = products.find(p=>p.barcode===code);
+  if(!p){ alert("Not found"); return; }
+  document.getElementById("sBarcode").textContent = p.barcode;
+  document.getElementById("sName").textContent = p.name;
+  document.getElementById("sPrice").textContent = p.price;
+  document.getElementById("sWholesale").textContent = p.wholesale;
+  document.getElementById("searchModal").style.display="block";
+}
+function closeSearchModal(){ document.getElementById("searchModal").style.display="none"; }
+
+// --- INIT ---
+fetchProducts();
+</script>
+</body>
+</html>
