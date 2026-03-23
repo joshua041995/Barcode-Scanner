@@ -17,8 +17,8 @@
   #productsListModal .modal-content { max-height:80vh; overflow-y:auto; }
   .product-row { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ccc; padding:5px 0; font-size:1.1rem; }
   .product-row button { font-size:0.9rem; padding:5px; margin-left:5px; }
-  /* barcode input camera button */
   #scanBarcodeBtn { position:absolute; right:5px; top:5px; height:30px; width:30px; border:none; background:#4CAF50; color:white; border-radius:50%; font-size:18px; }
+  #clearFieldsBtn { background:#f44336; color:#fff; margin-top:10px; }
 </style>
 </head>
 <body>
@@ -28,7 +28,7 @@
 
 <div style="padding:10px; display:flex; justify-content:center; flex-wrap:wrap;">
   <button onclick="openProductsModal()">Products</button>
-  <button onclick="startScan()">Search</button>
+  <button onclick="startScan('search')">Search</button>
   <button onclick="refreshPage()">Refresh</button>
 </div>
 
@@ -43,8 +43,11 @@
     <input id="manualNameInput" placeholder="Product Name">
     <input id="manualPriceInput" type="number" placeholder="Price">
     <input id="manualWholesaleInput" type="number" placeholder="Wholesale Price">
-    <button onclick="saveManualProduct()">Save</button>
-    <button onclick="closeManualModal()">Cancel</button>
+    <div style="display:flex; justify-content:space-between; flex-wrap:wrap;">
+      <button onclick="saveManualProduct()">Save</button>
+      <button id="clearFieldsBtn" onclick="clearManualFields()">Clear</button>
+      <button onclick="closeManualModal()">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -57,18 +60,28 @@
   </div>
 </div>
 
-<!-- Audio for beep -->
-<audio id="beepAudio" src="beep.mp3" preload="auto"></audio>
+<!-- Audio -->
+<audio id="beepAudio" src="beep.mp3.wav" preload="auto"></audio>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
 let products = JSON.parse(localStorage.getItem('products') || '[]');
+let html5Scanner;  // Single scanner instance
+let scanMode = ''; // 'search' or 'manual'
+
 function refreshPage(){ location.reload(); }
 
 // Manual Add
 const manualBtn = document.getElementById('manualAddBtn');
 manualBtn.addEventListener('click', ()=>{ document.getElementById('manualAddModal').style.display='flex'; });
 function closeManualModal(){ document.getElementById('manualAddModal').style.display='none'; }
+
+function clearManualFields(){
+  document.getElementById('manualBarcodeInput').value = '';
+  document.getElementById('manualNameInput').value = '';
+  document.getElementById('manualPriceInput').value = '';
+  document.getElementById('manualWholesaleInput').value = '';
+}
 
 function saveManualProduct(){
   const barcode = document.getElementById('manualBarcodeInput').value;
@@ -109,23 +122,36 @@ function editProduct(i){
   document.getElementById('manualWholesaleInput').value = p.wholesale;
   document.getElementById('manualAddModal').style.display='flex';
   closeProductsModal();
-  products.splice(i,1); // Remove old entry before saving
+  products.splice(i,1);
 }
 
-// Barcode Scanner
-let html5QrcodeScanner;
-function startScan(){
-  const qrCodeRegionId = "scanner";
-  html5QrcodeScanner = new Html5Qrcode(qrCodeRegionId);
+// Initialize scanner once
+function initScanner(){
+  if(!html5Scanner){
+    html5Scanner = new Html5Qrcode("scanner");
+  }
+}
+
+// Start scan
+function startScan(mode){
+  scanMode = mode; // remember mode
+  initScanner();
   Html5Qrcode.getCameras().then(cameras=>{
     if(cameras && cameras.length){ 
-      html5QrcodeScanner.start(
-        { facingMode: "environment" }, 
+      html5Scanner.start(
+        { facingMode: "environment" },
         { fps: 10, qrbox: 250 },
         qrCodeMessage => {
-          const existing = products.find(p=>p.barcode===qrCodeMessage);
-          if(existing){ alert(`Found: ${existing.name} ₱${existing.price}`); document.getElementById('beepAudio').play(); }
-          else{ alert(`Barcode: ${qrCodeMessage} not in list`); document.getElementById('beepAudio').play(); }
+          document.getElementById('beepAudio').play();
+          if(scanMode==='search'){
+            const existing = products.find(p=>p.barcode===qrCodeMessage);
+            if(existing){ alert(`Found: ${existing.name} ₱${existing.price}`); }
+            else{ alert(`Barcode: ${qrCodeMessage} not in list`); }
+          } else if(scanMode==='manual'){
+            document.getElementById('manualBarcodeInput').value = qrCodeMessage;
+            closeModalTemp();
+          }
+          html5Scanner.stop().then(()=>{}).catch(err=>console.log(err));
         },
         err => console.log(err)
       );
@@ -133,37 +159,16 @@ function startScan(){
   }).catch(err=>alert("Camera error: "+err));
 }
 
-// PWA service worker
+// Modal scanner: hide modal
+function closeModalTemp(){ document.getElementById('manualAddModal').style.display='flex'; }
+
+// PWA
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js'); }
 
-// Manual barcode scanner button
+// Barcode icon in modal
 document.getElementById('scanBarcodeBtn').addEventListener('click', () => {
-  const tempDiv = document.createElement('div');
-  tempDiv.id = 'tempScanner';
-  tempDiv.style.position = 'fixed';
-  tempDiv.style.top = 0;
-  tempDiv.style.left = 0;
-  tempDiv.style.width = '100%';
-  tempDiv.style.height = '100%';
-  tempDiv.style.background = '#000';
-  tempDiv.style.zIndex = 100000;
-  document.body.appendChild(tempDiv);
-
-  const html5Scanner = new Html5Qrcode('tempScanner');
-  Html5Qrcode.getCameras().then(cameras => {
-    if(cameras && cameras.length){
-      html5Scanner.start(
-        { facingMode: "environment" }, 
-        { fps: 10, qrbox: 250 },
-        (barcodeMessage) => {
-          document.getElementById('manualBarcodeInput').value = barcodeMessage;
-          document.getElementById('beepAudio').play();
-          html5Scanner.stop().then(()=>{ html5Scanner.clear(); document.body.removeChild(tempDiv); }).catch(err=>console.log(err));
-        },
-        err => console.log(err)
-      );
-    }
-  }).catch(err => { alert("Camera error: "+err); document.body.removeChild(tempDiv); });
+  document.getElementById('manualAddModal').style.display='none';
+  startScan('manual');
 });
 </script>
 </body>
