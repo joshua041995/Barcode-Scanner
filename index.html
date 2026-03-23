@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App - Supabase Stable Version</title>
+<title>Barcode Scanner App - Supabase Mobile Compatible</title>
 <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 
 <style>
 body { font-family: Arial; padding: 20px; }
-#scanner { width: 100%; height: 350px; border: 1px solid #ccc; margin-bottom: 20px; }
+#scanner { width: 100%; height: 350px; border: 1px solid #ccc; margin-bottom: 20px; position: relative; }
+#scanner video { width: 100%; height: 100%; object-fit: cover; }
+
 button { padding: 10px 18px; font-size: 16px; margin: 4px; }
 
 /* MODALS */
@@ -49,6 +51,7 @@ input {
 
 <!-- ADD MODAL -->
 <div id="popup" class="modal">
+<label>Barcode: <input type="text" id="manualBarcode" placeholder="Scan or type barcode"></label>
 <label>ProdName: <input type="text" id="prodName"></label>
 <label>Price: <input type="number" id="price"></label>
 <label>Wholesale: <input type="number" id="wholesale"></label>
@@ -109,57 +112,43 @@ async function fetchProducts(){
 }
 
 // ---------------- OPEN / CLOSE LIST ----------------
-function openList(){
-    fetchProducts();
-    document.getElementById("listModal").style.display = "block";
-}
+function openList(){ fetchProducts(); document.getElementById("listModal").style.display = "block"; }
 function closeList(){ document.getElementById("listModal").style.display = "none"; }
 
 // ---------------- RENDER PRODUCTS ----------------
 function renderProducts(){
     const list = document.getElementById("product-list");
     list.innerHTML = "";
-
     products.forEach((p,index)=>{
         const li = document.createElement("li");
         li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale}`;
-
         const editBtn = document.createElement("button");
-        editBtn.textContent="Edit";
-        editBtn.onclick=()=>openEdit(index);
-
+        editBtn.textContent="Edit"; editBtn.onclick=()=>openEdit(index);
         const delBtn = document.createElement("button");
-        delBtn.textContent="Delete";
-        delBtn.onclick=async ()=>{
-            const { error } = await supabase.from('products').delete().eq('barcode', p.barcode);
-            if(error) return alert(error.message);
-            fetchProducts();
+        delBtn.textContent="Delete"; delBtn.onclick=async ()=>{
+            await supabase.from('products').delete().eq('barcode', p.barcode); fetchProducts();
         };
-
-        li.appendChild(editBtn);
-        li.appendChild(delBtn);
-        list.appendChild(li);
+        li.appendChild(editBtn); li.appendChild(delBtn); list.appendChild(li);
     });
 }
 
 // ---------------- DELETE EMPTY ----------------
 async function deleteEmptyProducts(){
-    for(const p of products){
-        if(!p.name && !p.price && !p.wholesale){
-            await supabase.from('products').delete().eq('barcode', p.barcode);
-        }
-    }
+    for(const p of products){ if(!p.name && !p.price && !p.wholesale){
+        await supabase.from('products').delete().eq('barcode', p.barcode);
+    }}
     fetchProducts();
 }
 
-// ---------------- SCANNER (OLD STABLE) ----------------
+// ---------------- CAMERA SCANNER ----------------
 function startScanner(){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        alert("Camera not supported! You can enter barcode manually.");
+        return;
+    }
+
     Quagga.init({
-        inputStream:{
-            type:"LiveStream",
-            target:document.querySelector('#scanner'),
-            constraints:{ facingMode: "environment" } // simple stable
-        },
+        inputStream:{ type:"LiveStream", target:document.querySelector('#scanner'), constraints:{ facingMode:"environment" } },
         decoder:{ readers:["ean_reader","ean_8_reader","upc_reader"] }
     }, err=>{
         if(err) return console.error(err);
@@ -167,98 +156,69 @@ function startScanner(){
     });
 
     Quagga.onDetected(result=>{
-        const now=Date.now();
-        if(now-lastScan<1500) return;
-        lastScan=now;
-
+        const now = Date.now(); if(now-lastScan<1500) return; lastScan=now;
         const code=result.codeResult.code;
         Quagga.stop();
-
-        if(searchMode){
-            searchBarcode(code);
-        } else {
-            currentBarcode=code;
-            openPopup();
-        }
+        currentBarcode = code;
+        document.getElementById("manualBarcode").value = code;
+        openPopup();
     });
 }
 
 // ---------------- BUTTONS ----------------
-document.getElementById("start-scan").onclick=()=>{
-    searchMode=false;
-    startScanner();
-};
-document.getElementById("search-product").onclick=()=>{
-    searchMode=true;
-    startScanner();
-};
+document.getElementById("start-scan").onclick=()=>{ searchMode=false; startScanner(); };
+document.getElementById("search-product").onclick=()=>{ searchMode=true; startScanner(); };
 
 // ---------------- ADD PRODUCT ----------------
 function openPopup(){ document.getElementById("popup").style.display="block"; }
 function closePopup(){ document.getElementById("popup").style.display="none"; }
 
 async function saveProduct(){
+    let barcode = currentBarcode || document.getElementById("manualBarcode").value;
+    if(!barcode){ alert("Enter barcode!"); return; }
+
     const name = document.getElementById("prodName").value;
     const priceVal = document.getElementById("price").value;
     const wholesaleVal = document.getElementById("wholesale").value;
-
     if(!name){ alert("Enter product name"); return; }
 
-    // Check duplicate
-    const { data: existing } = await supabase.from('products').select('*').eq('barcode', currentBarcode).single();
+    const { data: existing } = await supabase.from('products').select('*').eq('barcode', barcode).single();
     if(existing){ alert("⚠️ Product already exists!"); closePopup(); return; }
 
-    const { error } = await supabase.from('products')
-        .insert([{ barcode: currentBarcode, name, price: priceVal, wholesale: wholesaleVal }]);
-    if(error) return alert(error.message);
+    await supabase.from('products').insert([{ barcode, name, price: priceVal, wholesale: wholesaleVal }]);
 
-    document.getElementById("prodName").value="";
-    document.getElementById("price").value="";
-    document.getElementById("wholesale").value="";
+    document.getElementById("manualBarcode").value=""; document.getElementById("prodName").value="";
+    document.getElementById("price").value=""; document.getElementById("wholesale").value="";
 
-    closePopup();
-    alert("✅ Saved!");
-    fetchProducts();
+    closePopup(); alert("✅ Saved!"); fetchProducts();
+    currentBarcode="";
 }
 
 // ---------------- EDIT PRODUCT ----------------
 function openEdit(i){
     editIndex=i;
-    const p = products[i];
+    const p=products[i];
     document.getElementById("editName").value = p.name;
     document.getElementById("editPrice").value = p.price;
     document.getElementById("editWholesale").value = p.wholesale;
-
     document.getElementById("listModal").style.display="none";
     document.getElementById("editModal").style.display="block";
 }
 function closeEdit(){ document.getElementById("editModal").style.display="none"; }
-
 async function updateProduct(){
     const name = document.getElementById("editName").value;
-    const priceVal = document.getElementById("editPrice").value;
-    const wholesaleVal = document.getElementById("editWholesale").value;
-
-    const { error } = await supabase.from('products')
-        .update({ name, price: priceVal, wholesale: wholesaleVal })
-        .eq('barcode', products[editIndex].barcode);
-    if(error) return alert(error.message);
-
-    closeEdit();
-    fetchProducts();
-    openList();
+    const price = document.getElementById("editPrice").value;
+    const wholesale = document.getElementById("editWholesale").value;
+    await supabase.from('products').update({name,price,wholesale}).eq('barcode',products[editIndex].barcode);
+    closeEdit(); fetchProducts(); openList();
 }
 
 // ---------------- SEARCH ----------------
 async function searchBarcode(code){
-    const { data, error } = await supabase.from('products')
-        .select('*').eq('barcode', code).single();
-    if(error || !data){ alert("Not found"); return; }
-
-    sBarcode.textContent = data.barcode;
-    sName.textContent = data.name;
-    sPrice.textContent = data.price;
-    sWholesale.textContent = data.wholesale;
+    const { data } = await supabase.from('products').select('*').eq('barcode', code).single();
+    if(!data){ alert("Not found"); return; }
+    sBarcode.textContent=data.barcode; sName.textContent=data.name;
+    sPrice.textContent=data.price; sWholesale.textContent=data.wholesale;
     document.getElementById("searchModal").style.display="block";
 }
 function closeSearchModal(){ document.getElementById("searchModal").style.display="none"; }
