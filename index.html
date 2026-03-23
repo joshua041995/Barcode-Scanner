@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App (LocalStorage)</title>
+<title>Barcode Scanner App (LocalStorage, Back Camera)</title>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
 
@@ -92,9 +92,7 @@ let editIndex = null;
 function refreshPage(){ location.reload(); }
 
 // --- SAVE TO LOCALSTORAGE ---
-function saveToStorage(){
-  localStorage.setItem('products', JSON.stringify(products));
-}
+function saveToStorage(){ localStorage.setItem('products', JSON.stringify(products)); }
 
 // --- FETCH PRODUCTS ---
 function fetchProducts(){ renderProducts(); }
@@ -133,11 +131,15 @@ async function startScanner(mode){
   try {
     if(html5QrCode){ try{ await html5QrCode.stop(); } catch{} html5QrCode=null; }
     html5QrCode = new Html5Qrcode("scanner");
+
     const devices = await Html5Qrcode.getCameras();
     if(!devices.length){ alert("No camera found"); return; }
 
+    // Select back camera if available
+    let backCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
+
     await html5QrCode.start(
-      devices[0].id,
+      backCamera.id,
       { fps:10, qrbox:250 },
       decodedText=>{
         html5QrCode.stop();
@@ -162,7 +164,6 @@ function saveProduct(){
   let wholesale = document.getElementById("wholesale").value;
 
   if(!barcode||!name){ alert("Missing data"); return; }
-
   if(products.find(p=>p.barcode===barcode)){ alert("Product already exists"); return; }
 
   products.push({ barcode,name,price,wholesale });
