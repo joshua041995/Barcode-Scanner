@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Barcode Scanner App</title>
+    <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        #scanner { width: 100%; height: 250px; border: 1px solid #ccc; margin-bottom: 20px; }
+        button { padding: 10px 20px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h2>Barcode Scanner App</h2>
+    <button id="start-scan">Start Scan</button>
+    <div id="scanner"></div>
+
+    <h3>Saved Products</h3>
+    <ul id="product-list"></ul>
+
+    <script>
+        let products = JSON.parse(localStorage.getItem("products")) || [];
+
+        function renderProducts() {
+            const list = document.getElementById("product-list");
+            list.innerHTML = "";
+            products.forEach(p => {
+                const li = document.createElement("li");
+                li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale}`;
+                list.appendChild(li);
+            });
+        }
+
+        document.getElementById("start-scan").addEventListener("click", () => {
+            Quagga.init({
+                inputStream : {
+                    name : "Live",
+                    type : "LiveStream",
+                    target: document.querySelector('#scanner'),
+                    constraints: {
+                        facingMode: "environment"
+                    }
+                },
+                decoder : {
+                    readers : ["code_128_reader","ean_reader","ean_8_reader","upc_reader"]
+                }
+            }, function(err) {
+                if (err) { console.error(err); return; }
+                Quagga.start();
+            });
+
+            Quagga.onDetected(function(result) {
+                const code = result.codeResult.code;
+                Quagga.stop();
+
+                const name = prompt("ProdName:");
+                const price = prompt("Price:");
+                const wholesale = prompt("WholeSalePrice:");
+
+                products.push({ barcode: code, name, price, wholesale });
+                localStorage.setItem("products", JSON.stringify(products));
+                renderProducts();
+            });
+        });
+
+        renderProducts();
+    </script>
+</body>
+</html>
