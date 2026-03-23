@@ -1,25 +1,267 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Barcode Scanner App</title>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
+
+<style>
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background:#f5f7fb;
+    margin:0;
+    padding:15px;
+}
+
+h2 {
+    text-align:center;
+}
+
+/* BUTTONS */
+.top-buttons {
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin:15px 0;
+}
+
+button {
+    flex:1;
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    font-size:14px;
+    font-weight:bold;
+    background:#4CAF50;
+    color:white;
+}
+
+/* SCANNER */
+#scanner {
+    width:100%;
+    height:280px;
+    border-radius:15px;
+    overflow:hidden;
+    background:black;
+}
+
+/* MODALS */
+.modal {
+    display:none;
+    position:fixed;
+    bottom:0;
+    width:100%;
+    background:white;
+    border-radius:20px 20px 0 0;
+    padding:20px;
+    box-shadow:0 -4px 10px rgba(0,0,0,0.3);
+    max-height:80%;
+    overflow:auto;
+}
+
+/* INPUTS */
+input {
+    width:100%;
+    padding:10px;
+    margin-bottom:10px;
+    border-radius:8px;
+    border:1px solid #ccc;
+}
+
+/* LIST */
+#product-list li {
+    background:white;
+    margin-bottom:10px;
+    padding:12px;
+    border-radius:12px;
+    list-style:none;
+}
+
+/* SMALL BUTTONS */
+.small-btn {
+    padding:6px 10px;
+    font-size:12px;
+    margin-left:5px;
+    background:#2196F3;
+}
+.delete-btn { background:#f44336; }
+</style>
+</head>
+
 <body>
 
-<h2>Camera Test</h2>
+<h2>📦 Barcode Scanner</h2>
 
-<button onclick="startCamera()">Start Camera</button>
+<div class="top-buttons">
+<button onclick="startScanner(false)">➕ Add</button>
+<button onclick="startScanner(true)">🔍 Search</button>
+<button onclick="openList()">📋 Products</button>
+<button onclick="refreshPage()">🔄 Refresh</button>
+</div>
 
-<video id="video" autoplay playsinline width="100%"></video>
+<div id="scanner"></div>
+
+<!-- ADD MODAL -->
+<div id="popup" class="modal">
+<h3>Add Product</h3>
+<input id="manualBarcode" placeholder="Barcode">
+<input id="prodName" placeholder="Product Name">
+<input id="price" type="number" placeholder="Price">
+<input id="wholesale" type="number" placeholder="Wholesale Price">
+<button onclick="saveProduct()">Save</button>
+<button onclick="closePopup()">Cancel</button>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="editModal" class="modal">
+<h3>Edit Product</h3>
+<input id="editName">
+<input id="editPrice" type="number">
+<input id="editWholesale" type="number">
+<button onclick="updateProduct()">Update</button>
+<button onclick="closeEdit()">Cancel</button>
+</div>
+
+<!-- SEARCH MODAL -->
+<div id="searchModal" class="modal">
+<h3>Product Info</h3>
+<p><b>Barcode:</b> <span id="sBarcode"></span></p>
+<p><b>Name:</b> <span id="sName"></span></p>
+<p><b>Price:</b> <span id="sPrice"></span></p>
+<p><b>Wholesale:</b> <span id="sWholesale"></span></p>
+<button onclick="closeSearchModal()">Close</button>
+</div>
+
+<!-- LIST MODAL -->
+<div id="listModal" class="modal">
+<h3>Saved Products</h3>
+<ul id="product-list"></ul>
+<button onclick="closeList()">Close</button>
+</div>
 
 <script>
-async function startCamera(){
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }
-        });
-        document.getElementById("video").srcObject = stream;
-    } catch (err) {
-        alert("Camera error: " + err.message);
-        console.error(err);
-    }
+// SUPABASE
+const supabase = supabase.createClient(
+'https://sdmhthsjkivujmdlaepv.supabase.co',
+'sb_publishable_KDqLJlPRj0A6MIj1c-XMiw_agu52AzC'
+);
+
+let products=[], currentBarcode="", searchMode=false, html5QrCode, editIndex;
+
+// REFRESH
+function refreshPage(){ location.reload(); }
+
+// FETCH
+async function fetchProducts(){
+    const { data } = await supabase.from('products').select('*');
+    products=data||[];
+    renderProducts();
 }
+
+// LIST
+function openList(){ fetchProducts(); listModal.style.display="block"; }
+function closeList(){ listModal.style.display="none"; }
+
+// RENDER
+function renderProducts(){
+    product-list.innerHTML="";
+    products.forEach((p,i)=>{
+        let li=document.createElement("li");
+        li.innerHTML = `
+        <b>${p.name}</b><br>
+        ${p.barcode}<br>
+        ₱${p.price} | ₱${p.wholesale}
+        <br>
+        <button class="small-btn" onclick="openEdit(${i})">Edit</button>
+        <button class="small-btn delete-btn" onclick="deleteProduct('${p.barcode}')">Delete</button>
+        `;
+        product-list.appendChild(li);
+    });
+}
+
+// DELETE
+async function deleteProduct(barcode){
+    await supabase.from('products').delete().eq('barcode', barcode);
+    fetchProducts();
+}
+
+// SCANNER
+function startScanner(mode){
+    searchMode=mode;
+    scanner.innerHTML="";
+    html5QrCode=new Html5Qrcode("scanner");
+
+    Html5Qrcode.getCameras().then(devices=>{
+        html5QrCode.start(devices[0].id,{fps:10,qrbox:250},
+        txt=>{
+            html5QrCode.stop();
+            currentBarcode=txt;
+            manualBarcode.value=txt;
+            searchMode?searchBarcode(txt):openPopup();
+        });
+    });
+}
+
+// ADD
+function openPopup(){ popup.style.display="block"; }
+function closePopup(){ popup.style.display="none"; }
+
+async function saveProduct(){
+    let barcode=currentBarcode||manualBarcode.value;
+    let name=prodName.value;
+    let price=price.value;
+    let wholesale=wholesale.value;
+
+    if(!barcode||!name){ alert("Missing data"); return; }
+
+    let { data:exist } = await supabase.from('products').select('*').eq('barcode',barcode).single();
+    if(exist){ alert("Already exists"); return; }
+
+    await supabase.from('products').insert([{barcode,name,price,wholesale}]);
+
+    popup.style.display="none";
+    fetchProducts();
+}
+
+// EDIT
+function openEdit(i){
+    editIndex=i;
+    let p=products[i];
+    editName.value=p.name;
+    editPrice.value=p.price;
+    editWholesale.value=p.wholesale;
+    listModal.style.display="none";
+    editModal.style.display="block";
+}
+function closeEdit(){ editModal.style.display="none"; }
+
+async function updateProduct(){
+    await supabase.from('products')
+    .update({
+        name:editName.value,
+        price:editPrice.value,
+        wholesale:editWholesale.value
+    }).eq('barcode',products[editIndex].barcode);
+
+    closeEdit(); fetchProducts(); openList();
+}
+
+// SEARCH
+async function searchBarcode(code){
+    let { data } = await supabase.from('products').select('*').eq('barcode',code).single();
+    if(!data){ alert("Not found"); return; }
+    sBarcode.textContent=data.barcode;
+    sName.textContent=data.name;
+    sPrice.textContent=data.price;
+    sWholesale.textContent=data.wholesale;
+    searchModal.style.display="block";
+}
+function closeSearchModal(){ searchModal.style.display="none"; }
+
+// INIT
+fetchProducts();
 </script>
 
 </body>
