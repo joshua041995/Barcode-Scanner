@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App (LocalStorage, Full-Width)</title>
+<title>Barcode Scanner App (LocalStorage, Full-Width, Sound)</title>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
 
@@ -88,126 +88,6 @@ let searchMode = false;
 let html5QrCode = null;
 let editIndex = null;
 
-// --- REFRESH ---
-function refreshPage(){ location.reload(); }
-
-// --- SAVE TO LOCALSTORAGE ---
-function saveToStorage(){ localStorage.setItem('products', JSON.stringify(products)); }
-
-// --- FETCH PRODUCTS ---
-function fetchProducts(){ renderProducts(); }
-
-// --- LIST MODAL ---
-function openList(){ fetchProducts(); document.getElementById("listModal").style.display="block"; }
-function closeList(){ document.getElementById("listModal").style.display="none"; }
-
-// --- RENDER PRODUCTS ---
-function renderProducts(){
-  const list = document.getElementById("product-list");
-  list.innerHTML = "";
-  products.forEach((p,i)=>{
-    let li = document.createElement("li");
-    li.innerHTML = `<b>${p.name}</b><br>${p.barcode}<br>₱${p.price} | ₱${p.wholesale}<br>
-      <button class="small-btn" onclick="openEdit(${i})">Edit</button>
-      <button class="small-btn delete-btn" onclick="deleteProduct(${i})">Delete</button>`;
-    list.appendChild(li);
-  });
-}
-
-// --- DELETE PRODUCT ---
-function deleteProduct(index){
-  if(!confirm("Delete this product?")) return;
-  products.splice(index,1);
-  saveToStorage();
-  fetchProducts();
-}
-
-// --- SCANNER ---
-async function startScanner(mode){
-  searchMode = mode;
-  const scannerDiv = document.getElementById("scanner");
-  scannerDiv.innerHTML = "";
-
-  try {
-    if(html5QrCode){ try{ await html5QrCode.stop(); } catch{} html5QrCode=null; }
-    html5QrCode = new Html5Qrcode("scanner");
-
-    const devices = await Html5Qrcode.getCameras();
-    if(!devices.length){ alert("No camera found"); return; }
-
-    // Pick back camera if available, else first
-    let backCamera = devices.find(d=>d.label.toLowerCase().includes("back")) || devices[0];
-
-    await html5QrCode.start(
-      backCamera.id,
-      { fps:10 },  // FULL preview, no qrbox
-      decodedText=>{
-        html5QrCode.stop();
-        currentBarcode = decodedText;
-        document.getElementById("manualBarcode").value = decodedText;
-        if(searchMode) searchBarcode(decodedText);
-        else openPopup();
-      }
-    );
-
-  } catch(err){ console.error(err); alert("Camera error: "+err); }
-}
-
-// --- ADD PRODUCT ---
-function openPopup(){ document.getElementById("popup").style.display="block"; }
-function closePopup(){ document.getElementById("popup").style.display="none"; }
-
-function saveProduct(){
-  let barcode = currentBarcode || document.getElementById("manualBarcode").value;
-  let name = document.getElementById("prodName").value;
-  let price = document.getElementById("price").value;
-  let wholesale = document.getElementById("wholesale").value;
-
-  if(!barcode||!name){ alert("Missing data"); return; }
-  if(products.find(p=>p.barcode===barcode)){ alert("Product already exists"); return; }
-
-  products.push({ barcode,name,price,wholesale });
-  saveToStorage();
-  closePopup();
-  fetchProducts();
-}
-
-// --- EDIT PRODUCT ---
-function openEdit(i){
-  editIndex=i;
-  let p=products[i];
-  document.getElementById("editName").value=p.name;
-  document.getElementById("editPrice").value=p.price;
-  document.getElementById("editWholesale").value=p.wholesale;
-  closeList();
-  document.getElementById("editModal").style.display="block";
-}
-function closeEdit(){ document.getElementById("editModal").style.display="none"; }
-
-function updateProduct(){
-  products[editIndex].name = document.getElementById("editName").value;
-  products[editIndex].price = document.getElementById("editPrice").value;
-  products[editIndex].wholesale = document.getElementById("editWholesale").value;
-  saveToStorage();
-  closeEdit();
-  fetchProducts();
-  openList();
-}
-
-// --- SEARCH PRODUCT ---
-function searchBarcode(code){
-  let p = products.find(p=>p.barcode===code);
-  if(!p){ alert("Not found"); return; }
-  document.getElementById("sBarcode").textContent = p.barcode;
-  document.getElementById("sName").textContent = p.name;
-  document.getElementById("sPrice").textContent = p.price;
-  document.getElementById("sWholesale").textContent = p.wholesale;
-  document.getElementById("searchModal").style.display="block";
-}
-function closeSearchModal(){ document.getElementById("searchModal").style.display="none"; }
-
-// --- INIT ---
-fetchProducts();
-</script>
-</body>
-</html>
+// --- SOUND ---
+const beepSound = new Audio("https://www.soundjay.com/button/be
+                            
