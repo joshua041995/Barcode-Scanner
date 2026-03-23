@@ -2,37 +2,37 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App (Sound Fixed)</title>
+<title>Barcode Scanner App (Mobile-Friendly Fonts)</title>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
 
 <style>
 body { font-family:'Segoe UI', sans-serif; background:#f5f7fb; margin:0; padding:15px; }
-h2 { text-align:center; }
+h2 { text-align:center; font-size:1.8rem; }
 
 /* Buttons */
 .top-buttons { display:flex; flex-wrap:wrap; gap:10px; margin:15px 0; }
-button { flex:1; padding:12px; border:none; border-radius:10px; font-weight:bold; background:#4CAF50; color:white; z-index:10000; position:relative; }
+button { flex:1; padding:14px; border:none; border-radius:12px; font-weight:bold; font-size:1.1rem; background:#4CAF50; color:white; z-index:10000; position:relative; }
 
 /* Scanner */
 #scanner { width:100%; height:400px; border-radius:15px; overflow:hidden; background:black; position:relative; z-index:1; }
 #scanner video { pointer-events: none; } /* allow clicks to pass through video */
 
 /* Modals */
-.modal { display:none; position:fixed; bottom:0; width:100%; background:white; border-radius:20px 20px 0 0; padding:20px; box-shadow:0px -2px 10px rgba(0,0,0,0.2); z-index:9999; }
+.modal { display:none; position:fixed; bottom:0; width:100%; background:white; border-radius:20px 20px 0 0; padding:25px; box-shadow:0px -2px 15px rgba(0,0,0,0.3); z-index:9999; font-size:1.1rem; }
 
 /* Inputs */
-input { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ccc; }
+input { width:100%; padding:12px; margin-bottom:12px; border-radius:10px; border:1px solid #ccc; font-size:1rem; }
 
 /* List */
-#product-list li { background:white; margin-bottom:10px; padding:12px; border-radius:12px; list-style:none; }
-.small-btn { padding:6px 10px; font-size:12px; margin-top:5px; background:#2196F3; }
+#product-list li { background:white; margin-bottom:12px; padding:14px; border-radius:14px; list-style:none; font-size:1.05rem; line-height:1.4; }
+.small-btn { padding:8px 12px; font-size:1rem; margin-top:8px; background:#2196F3; border-radius:8px; }
 .delete-btn { background:#f44336; }
 </style>
 </head>
 <body>
 
-<h2>📦 Barcode Scanner (LocalStorage)</h2>
+<h2>📦 Barcode Scanner (Mobile-Friendly)</h2>
 
 <div class="top-buttons">
   <button onclick="startScanner(false)">➕ Add</button>
@@ -45,7 +45,7 @@ input { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:
 
 <!-- Add Modal -->
 <div id="popup" class="modal">
-<h3>Add Product</h3>
+<h3 style="font-size:1.4rem;">Add Product</h3>
 <input id="manualBarcode" placeholder="Barcode">
 <input id="prodName" placeholder="Product Name">
 <input id="price" type="number" placeholder="Price">
@@ -56,7 +56,7 @@ input { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:
 
 <!-- Edit Modal -->
 <div id="editModal" class="modal">
-<h3>Edit Product</h3>
+<h3 style="font-size:1.4rem;">Edit Product</h3>
 <input id="editName">
 <input id="editPrice" type="number">
 <input id="editWholesale" type="number">
@@ -66,7 +66,7 @@ input { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:
 
 <!-- Search Modal -->
 <div id="searchModal" class="modal">
-<h3>Product Info</h3>
+<h3 style="font-size:1.4rem;">Product Info</h3>
 <p><b>Barcode:</b> <span id="sBarcode"></span></p>
 <p><b>Name:</b> <span id="sName"></span></p>
 <p><b>Price:</b> <span id="sPrice"></span></p>
@@ -76,7 +76,7 @@ input { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:
 
 <!-- List Modal -->
 <div id="listModal" class="modal">
-<h3>Saved Products</h3>
+<h3 style="font-size:1.4rem;">Saved Products</h3>
 <ul id="product-list"></ul>
 <button onclick="closeList()">Close</button>
 </div>
