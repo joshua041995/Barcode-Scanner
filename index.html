@@ -17,6 +17,8 @@
   #productsListModal .modal-content { max-height:80vh; overflow-y:auto; }
   .product-row { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ccc; padding:5px 0; font-size:1.1rem; }
   .product-row button { font-size:0.9rem; padding:5px; margin-left:5px; }
+  /* barcode input camera button */
+  #scanBarcodeBtn { position:absolute; right:5px; top:5px; height:30px; width:30px; border:none; background:#4CAF50; color:white; border-radius:50%; font-size:18px; }
 </style>
 </head>
 <body>
@@ -34,7 +36,10 @@
 <div id="manualAddModal" class="modal">
   <div class="modal-content">
     <h3>Add Product Manually</h3>
-    <input id="manualBarcodeInput" placeholder="Barcode (optional)">
+    <div style="position:relative;">
+      <input id="manualBarcodeInput" placeholder="Barcode (optional)" style="padding-right:40px;">
+      <button id="scanBarcodeBtn">📷</button>
+    </div>
     <input id="manualNameInput" placeholder="Product Name">
     <input id="manualPriceInput" type="number" placeholder="Price">
     <input id="manualWholesaleInput" type="number" placeholder="Wholesale Price">
@@ -58,13 +63,13 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
 let products = JSON.parse(localStorage.getItem('products') || '[]');
-
 function refreshPage(){ location.reload(); }
 
 // Manual Add
 const manualBtn = document.getElementById('manualAddBtn');
 manualBtn.addEventListener('click', ()=>{ document.getElementById('manualAddModal').style.display='flex'; });
 function closeManualModal(){ document.getElementById('manualAddModal').style.display='none'; }
+
 function saveManualProduct(){
   const barcode = document.getElementById('manualBarcodeInput').value;
   const name = document.getElementById('manualNameInput').value;
@@ -130,6 +135,36 @@ function startScan(){
 
 // PWA service worker
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js'); }
+
+// Manual barcode scanner button
+document.getElementById('scanBarcodeBtn').addEventListener('click', () => {
+  const tempDiv = document.createElement('div');
+  tempDiv.id = 'tempScanner';
+  tempDiv.style.position = 'fixed';
+  tempDiv.style.top = 0;
+  tempDiv.style.left = 0;
+  tempDiv.style.width = '100%';
+  tempDiv.style.height = '100%';
+  tempDiv.style.background = '#000';
+  tempDiv.style.zIndex = 100000;
+  document.body.appendChild(tempDiv);
+
+  const html5Scanner = new Html5Qrcode('tempScanner');
+  Html5Qrcode.getCameras().then(cameras => {
+    if(cameras && cameras.length){
+      html5Scanner.start(
+        { facingMode: "environment" }, 
+        { fps: 10, qrbox: 250 },
+        (barcodeMessage) => {
+          document.getElementById('manualBarcodeInput').value = barcodeMessage;
+          document.getElementById('beepAudio').play();
+          html5Scanner.stop().then(()=>{ html5Scanner.clear(); document.body.removeChild(tempDiv); }).catch(err=>console.log(err));
+        },
+        err => console.log(err)
+      );
+    }
+  }).catch(err => { alert("Camera error: "+err); document.body.removeChild(tempDiv); });
+});
 </script>
 </body>
 </html>
