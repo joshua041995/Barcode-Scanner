@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App (Fixed UI, Sound)</title>
+<title>Barcode Scanner App (Sound Fixed)</title>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
 
@@ -91,6 +91,13 @@ let editIndex = null;
 
 // --- SOUND ---
 const beepSound = new Audio("https://www.soundjay.com/button/beep-07.mp3");
+beepSound.load();  // preload
+
+// Unlock audio on first user interaction
+document.body.addEventListener('click', function unlockAudio(){
+    beepSound.play().then(()=>{ beepSound.pause(); beepSound.currentTime=0; });
+    document.body.removeEventListener('click', unlockAudio);
+});
 
 // --- REFRESH ---
 function refreshPage(){ location.reload(); }
@@ -151,7 +158,7 @@ async function startScanner(mode){
 
         // --- PLAY SOUND ---
         beepSound.currentTime = 0;
-        beepSound.play();
+        beepSound.play().catch(()=>{}); // ignore if blocked
 
         if(searchMode) searchBarcode(decodedText);
         else openPopup();
