@@ -89,15 +89,19 @@ let searchMode = false;
 let html5QrCode = null;
 let editIndex = null;
 
-// --- SOUND ---
-const beepSound = new Audio("https://www.soundjay.com/button/beep-07.mp3");
-beepSound.load();  // preload
-
-// Unlock audio on first user interaction
-document.body.addEventListener('click', function unlockAudio(){
-    beepSound.play().then(()=>{ beepSound.pause(); beepSound.currentTime=0; });
-    document.body.removeEventListener('click', unlockAudio);
-});
+// --- WEB AUDIO BEEP ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playBeep(){
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.type = 'square';
+    oscillator.frequency.value = 1000; // 1kHz beep
+    gainNode.gain.value = 0.1; // volume
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.15); // 150ms beep
+}
 
 // --- REFRESH ---
 function refreshPage(){ location.reload(); }
@@ -150,15 +154,14 @@ async function startScanner(mode){
 
     await html5QrCode.start(
       backCamera.id,
-      { fps:10 },  // FULL preview, no qrbox
+      { fps:10 },
       decodedText=>{
         html5QrCode.stop();
         currentBarcode = decodedText;
         document.getElementById("manualBarcode").value = decodedText;
 
-        // --- PLAY SOUND ---
-        beepSound.currentTime = 0;
-        beepSound.play().catch(()=>{}); // ignore if blocked
+        // --- PLAY BEEP ---
+        playBeep();
 
         if(searchMode) searchBarcode(decodedText);
         else openPopup();
