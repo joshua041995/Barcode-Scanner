@@ -1,213 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Barcode Scanner App - Mobile Ready</title>
-
-<!-- html5-qrcode library -->
-<script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
-
-<style>
-body { font-family: Arial; padding: 20px; }
-#scanner { width: 100%; max-width: 400px; height: 300px; border: 1px solid #ccc; margin-bottom: 20px; }
-button { padding: 10px 18px; font-size: 16px; margin: 4px; }
-
-.modal {
-    display:none; position:fixed; top:10%; left:5%; width:90%;
-    background:white; padding:20px; border:1px solid black;
-    z-index:1000; box-shadow:0 0 10px rgba(0,0,0,0.3);
-    max-height:70%; overflow:auto;
-}
-input { width:100%; margin-bottom:8px; padding:6px; font-size:16px; }
-</style>
-</head>
+<html>
 <body>
 
-<h2>Supabase Barcode Scanner App</h2>
+<h2>Camera Test</h2>
 
-<button id="start-scan">Add Product</button>
-<button id="search-product">Search Product</button>
-<button onclick="openList()">Saved Products</button>
-<button onclick="refreshPage()">Refresh</button>
+<button onclick="startCamera()">Start Camera</button>
 
-<div id="scanner"></div>
-
-<!-- ADD MODAL -->
-<div id="popup" class="modal">
-<label>Barcode: <input type="text" id="manualBarcode" placeholder="Scan or type barcode"></label>
-<label>ProdName: <input type="text" id="prodName"></label>
-<label>Price: <input type="number" id="price"></label>
-<label>Wholesale: <input type="number" id="wholesale"></label>
-<button onclick="saveProduct()">Save</button>
-<button onclick="closePopup()">Cancel</button>
-</div>
-
-<!-- EDIT MODAL -->
-<div id="editModal" class="modal">
-<h3>Edit Product</h3>
-<label>Name: <input id="editName"></label>
-<label>Price: <input id="editPrice" type="number"></label>
-<label>Wholesale: <input id="editWholesale" type="number"></label>
-<button onclick="updateProduct()">Update</button>
-<button onclick="closeEdit()">Cancel</button>
-</div>
-
-<!-- SEARCH MODAL -->
-<div id="searchModal" class="modal">
-<h3>Product Found</h3>
-<p>Barcode: <span id="sBarcode"></span></p>
-<p>Name: <span id="sName"></span></p>
-<p>Price: <span id="sPrice"></span></p>
-<p>Wholesale: <span id="sWholesale"></span></p>
-<button onclick="closeSearchModal()">Close</button>
-</div>
-
-<!-- LIST MODAL -->
-<div id="listModal" class="modal">
-<h3>Saved Products</h3>
-<button onclick="deleteEmptyProducts()">Delete Empty</button>
-<ul id="product-list"></ul>
-<button onclick="closeList()">Close</button>
-</div>
+<video id="video" autoplay playsinline width="100%"></video>
 
 <script>
-// ---------------- SUPABASE INIT ----------------
-const SUPABASE_URL = 'https://sdmhthsjkivujmdlaepv.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_KDqLJlPRj0A6MIj1c-XMiw_agu52AzC';
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// ---------------- GLOBAL ----------------
-let products = [];
-let currentBarcode = "";
-let searchMode = false;
-let html5QrcodeScanner;
-
-// ---------------- REFRESH ----------------
-function refreshPage(){ location.reload(); }
-
-// ---------------- FETCH PRODUCTS ----------------
-async function fetchProducts(){
-    const { data, error } = await supabase.from('products').select('*');
-    if(error) return console.error(error);
-    products = data || [];
-    renderProducts();
+async function startCamera(){
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" }
+        });
+        document.getElementById("video").srcObject = stream;
+    } catch (err) {
+        alert("Camera error: " + err.message);
+        console.error(err);
+    }
 }
-
-// ---------------- OPEN / CLOSE LIST ----------------
-function openList(){ fetchProducts(); document.getElementById("listModal").style.display = "block"; }
-function closeList(){ document.getElementById("listModal").style.display = "none"; }
-
-// ---------------- RENDER PRODUCTS ----------------
-function renderProducts(){
-    const list = document.getElementById("product-list");
-    list.innerHTML = "";
-    products.forEach((p,index)=>{
-        const li = document.createElement("li");
-        li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale}`;
-        const editBtn = document.createElement("button");
-        editBtn.textContent="Edit"; editBtn.onclick=()=>openEdit(index);
-        const delBtn = document.createElement("button");
-        delBtn.textContent="Delete"; delBtn.onclick=async ()=>{
-            await supabase.from('products').delete().eq('barcode', p.barcode); fetchProducts();
-        };
-        li.appendChild(editBtn); li.appendChild(delBtn); list.appendChild(li);
-    });
-}
-
-// ---------------- DELETE EMPTY ----------------
-async function deleteEmptyProducts(){
-    for(const p of products){ if(!p.name && !p.price && !p.wholesale){
-        await supabase.from('products').delete().eq('barcode', p.barcode);
-    }}
-    fetchProducts();
-}
-
-// ---------------- CAMERA SCANNER ----------------
-function startScanner(mode){
-    searchMode = mode;
-    html5QrcodeScanner = new Html5Qrcode("scanner");
-    html5QrcodeScanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        (decodedText, decodedResult) => {
-            html5QrcodeScanner.stop();
-            currentBarcode = decodedText;
-            document.getElementById("manualBarcode").value = decodedText;
-            if(searchMode){
-                searchBarcode(decodedText);
-            } else {
-                openPopup();
-            }
-        },
-        (errorMessage) => { /* ignore errors while scanning */ }
-    ).catch(err=>{
-        alert("Camera not available. You can enter barcode manually.");
-    });
-}
-
-// ---------------- BUTTONS ----------------
-document.getElementById("start-scan").onclick=()=>{ startScanner(false); };
-document.getElementById("search-product").onclick=()=>{ startScanner(true); };
-
-// ---------------- ADD PRODUCT ----------------
-function openPopup(){ document.getElementById("popup").style.display="block"; }
-function closePopup(){ document.getElementById("popup").style.display="none"; }
-
-async function saveProduct(){
-    let barcode = currentBarcode || document.getElementById("manualBarcode").value;
-    if(!barcode){ alert("Enter barcode!"); return; }
-
-    const name = document.getElementById("prodName").value;
-    const priceVal = document.getElementById("price").value;
-    const wholesaleVal = document.getElementById("wholesale").value;
-    if(!name){ alert("Enter product name"); return; }
-
-    const { data: existing } = await supabase.from('products').select('*').eq('barcode', barcode).single();
-    if(existing){ alert("⚠️ Product already exists!"); closePopup(); return; }
-
-    await supabase.from('products').insert([{ barcode, name, price: priceVal, wholesale: wholesaleVal }]);
-
-    document.getElementById("manualBarcode").value="";
-    document.getElementById("prodName").value="";
-    document.getElementById("price").value="";
-    document.getElementById("wholesale").value="";
-
-    closePopup(); alert("✅ Saved!"); fetchProducts();
-    currentBarcode="";
-}
-
-// ---------------- EDIT PRODUCT ----------------
-function openEdit(i){
-    editIndex=i;
-    const p=products[i];
-    document.getElementById("editName").value = p.name;
-    document.getElementById("editPrice").value = p.price;
-    document.getElementById("editWholesale").value = p.wholesale;
-    document.getElementById("listModal").style.display="none";
-    document.getElementById("editModal").style.display="block";
-}
-function closeEdit(){ document.getElementById("editModal").style.display="none"; }
-async function updateProduct(){
-    const name = document.getElementById("editName").value;
-    const price = document.getElementById("editPrice").value;
-    const wholesale = document.getElementById("editWholesale").value;
-    await supabase.from('products').update({name,price,wholesale}).eq('barcode',products[editIndex].barcode);
-    closeEdit(); fetchProducts(); openList();
-}
-
-// ---------------- SEARCH ----------------
-async function searchBarcode(code){
-    const { data } = await supabase.from('products').select('*').eq('barcode', code).single();
-    if(!data){ alert("Not found"); return; }
-    sBarcode.textContent=data.barcode; sName.textContent=data.name;
-    sPrice.textContent=data.price; sWholesale.textContent=data.wholesale;
-    document.getElementById("searchModal").style.display="block";
-}
-function closeSearchModal(){ document.getElementById("searchModal").style.display="none"; }
-
-// ---------------- INITIAL LOAD ----------------
-fetchProducts();
 </script>
 
 </body>
