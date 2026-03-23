@@ -4,99 +4,49 @@
 <meta charset="UTF-8">
 <title>Barcode Scanner App</title>
 
+<!-- HTML5 QR Code Scanner -->
 <script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
+
+<!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 
 <style>
-body {
-    font-family: 'Segoe UI', sans-serif;
-    background:#f5f7fb;
-    margin:0;
-    padding:15px;
-}
-
+body { font-family:'Segoe UI', sans-serif; background:#f5f7fb; margin:0; padding:15px; }
 h2 { text-align:center; }
 
-/* BUTTONS */
-.top-buttons {
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
-    margin:15px 0;
-}
-button {
-    flex:1;
-    padding:12px;
-    border:none;
-    border-radius:10px;
-    font-weight:bold;
-    background:#4CAF50;
-    color:white;
-}
+/* Buttons */
+.top-buttons { display:flex; flex-wrap:wrap; gap:10px; margin:15px 0; }
+button { flex:1; padding:12px; border:none; border-radius:10px; font-weight:bold; background:#4CAF50; color:white; }
 
-/* SCANNER */
-#scanner {
-    width:100%;
-    height:280px;
-    border-radius:15px;
-    overflow:hidden;
-    background:black;
-}
+/* Scanner */
+#scanner { width:100%; height:280px; border-radius:15px; overflow:hidden; background:black; }
 
-/* MODALS */
-.modal {
-    display:none;
-    position:fixed;
-    bottom:0;
-    width:100%;
-    background:white;
-    border-radius:20px 20px 0 0;
-    padding:20px;
-}
+/* Modals */
+.modal { display:none; position:fixed; bottom:0; width:100%; background:white; border-radius:20px 20px 0 0; padding:20px; }
 
-/* INPUTS */
-input {
-    width:100%;
-    padding:10px;
-    margin-bottom:10px;
-    border-radius:8px;
-    border:1px solid #ccc;
-}
+/* Inputs */
+input { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ccc; }
 
-/* LIST */
-#product-list li {
-    background:white;
-    margin-bottom:10px;
-    padding:12px;
-    border-radius:12px;
-    list-style:none;
-}
-
-/* SMALL BUTTONS */
-.small-btn {
-    padding:6px 10px;
-    font-size:12px;
-    margin-top:5px;
-    background:#2196F3;
-}
+/* List */
+#product-list li { background:white; margin-bottom:10px; padding:12px; border-radius:12px; list-style:none; }
+.small-btn { padding:6px 10px; font-size:12px; margin-top:5px; background:#2196F3; }
 .delete-btn { background:#f44336; }
 </style>
 </head>
-
 <body>
 
 <h2>📦 Barcode Scanner</h2>
 
 <div class="top-buttons">
-<button onclick="startScanner(false)">➕ Add</button>
-<button onclick="startScanner(true)">🔍 Search</button>
-<button onclick="openList()">📋 Products</button>
-<button onclick="refreshPage()">🔄 Refresh</button>
+  <button onclick="startScanner(false)">➕ Add</button>
+  <button onclick="startScanner(true)">🔍 Search</button>
+  <button onclick="openList()">📋 Products</button>
+  <button onclick="refreshPage()">🔄 Refresh</button>
 </div>
 
 <div id="scanner"></div>
 
-<!-- ADD MODAL -->
+<!-- Add Modal -->
 <div id="popup" class="modal">
 <h3>Add Product</h3>
 <input id="manualBarcode" placeholder="Barcode">
@@ -107,7 +57,7 @@ input {
 <button onclick="closePopup()">Cancel</button>
 </div>
 
-<!-- EDIT MODAL -->
+<!-- Edit Modal -->
 <div id="editModal" class="modal">
 <h3>Edit Product</h3>
 <input id="editName">
@@ -117,7 +67,7 @@ input {
 <button onclick="closeEdit()">Cancel</button>
 </div>
 
-<!-- SEARCH MODAL -->
+<!-- Search Modal -->
 <div id="searchModal" class="modal">
 <h3>Product Info</h3>
 <p><b>Barcode:</b> <span id="sBarcode"></span></p>
@@ -127,7 +77,7 @@ input {
 <button onclick="closeSearchModal()">Close</button>
 </div>
 
-<!-- LIST MODAL -->
+<!-- List Modal -->
 <div id="listModal" class="modal">
 <h3>Saved Products</h3>
 <ul id="product-list"></ul>
@@ -135,10 +85,10 @@ input {
 </div>
 
 <script>
-// SUPABASE
-const supabaseClient = supabase.createClient(
-'https://sdmhthsjkivujmdlaepv.supabase.co',
-'sb_publishable_KDqLJlPRj0A6MIj1c-XMiw_agu52AzC'
+// --- SUPABASE CLIENT ---
+const supabase = supabase.createClient(
+  "https://sdmhthsjkivujmdlaepv.supabase.co",
+  "sb_publishable_KDqLJlPRj0A6MIj1c-XMiw_agu52AzC" // YOUR ANON KEY
 );
 
 let products = [];
@@ -147,8 +97,142 @@ let searchMode = false;
 let html5QrCode = null;
 let editIndex = null;
 
-// REFRESH
+// --- REFRESH ---
 function refreshPage(){ location.reload(); }
 
-// FETCH
+// --- FETCH PRODUCTS ---
 async function fetchProducts(){
+  try {
+    const { data, error } = await supabase.from('products').select('*');
+    if(error){ console.error(error); return; }
+    products = data || [];
+    renderProducts();
+  } catch(e){ console.error("Fetch error:", e); }
+}
+
+// --- LIST MODAL ---
+function openList(){ fetchProducts(); document.getElementById("listModal").style.display="block"; }
+function closeList(){ document.getElementById("listModal").style.display="none"; }
+
+// --- RENDER PRODUCTS ---
+function renderProducts(){
+  const list = document.getElementById("product-list");
+  list.innerHTML = "";
+  products.forEach((p,i)=>{
+    let li = document.createElement("li");
+    li.innerHTML = `<b>${p.name}</b><br>${p.barcode}<br>₱${p.price} | ₱${p.wholesale}<br>
+      <button class="small-btn" onclick="openEdit(${i})">Edit</button>
+      <button class="small-btn delete-btn" onclick="deleteProduct('${p.barcode}')">Delete</button>`;
+    list.appendChild(li);
+  });
+}
+
+// --- DELETE PRODUCT ---
+async function deleteProduct(barcode){
+  try{
+    const { error } = await supabase.from('products').delete().eq('barcode', barcode);
+    if(error){ console.error(error); return; }
+    fetchProducts();
+  }catch(e){ console.error(e); }
+}
+
+// --- SCANNER ---
+async function startScanner(mode){
+  searchMode = mode;
+  const scannerDiv = document.getElementById("scanner");
+  scannerDiv.innerHTML = "";
+
+  try {
+    if(html5QrCode){ try{ await html5QrCode.stop(); } catch{} html5QrCode=null; }
+    html5QrCode = new Html5Qrcode("scanner");
+    const devices = await Html5Qrcode.getCameras();
+    if(!devices.length){ alert("No camera found"); return; }
+
+    await html5QrCode.start(
+      devices[0].id,
+      { fps:10, qrbox:250 },
+      decodedText=>{
+        html5QrCode.stop();
+        currentBarcode = decodedText;
+        document.getElementById("manualBarcode").value = decodedText;
+        if(searchMode) searchBarcode(decodedText);
+        else openPopup();
+      }
+    );
+
+  } catch(err){ console.error(err); alert("Camera error: "+err); }
+}
+
+// --- ADD PRODUCT ---
+function openPopup(){ document.getElementById("popup").style.display="block"; }
+function closePopup(){ document.getElementById("popup").style.display="none"; }
+
+async function saveProduct(){
+  let barcode = currentBarcode || document.getElementById("manualBarcode").value;
+  let name = document.getElementById("prodName").value;
+  let price = document.getElementById("price").value;
+  let wholesale = document.getElementById("wholesale").value;
+
+  if(!barcode||!name){ alert("Missing data"); return; }
+
+  try{
+    const { data: exist, error: e1 } = await supabase.from('products').select('*').eq('barcode', barcode).single();
+    if(e1){ console.error(e1); return; }
+    if(exist){ alert("Product already exists"); return; }
+
+    const { error } = await supabase.from('products').insert([{ barcode, name, price, wholesale }]);
+    if(error){ console.error(error); return; }
+
+    closePopup();
+    fetchProducts();
+  } catch(e){ console.error(e); }
+}
+
+// --- EDIT PRODUCT ---
+function openEdit(i){
+  editIndex=i;
+  let p=products[i];
+  document.getElementById("editName").value=p.name;
+  document.getElementById("editPrice").value=p.price;
+  document.getElementById("editWholesale").value=p.wholesale;
+  closeList();
+  document.getElementById("editModal").style.display="block";
+}
+function closeEdit(){ document.getElementById("editModal").style.display="none"; }
+
+async function updateProduct(){
+  try{
+    const { error } = await supabase.from('products').update({
+      name: document.getElementById("editName").value,
+      price: document.getElementById("editPrice").value,
+      wholesale: document.getElementById("editWholesale").value
+    }).eq('barcode', products[editIndex].barcode);
+
+    if(error){ console.error(error); return; }
+
+    closeEdit(); fetchProducts(); openList();
+  }catch(e){ console.error(e); }
+}
+
+// --- SEARCH PRODUCT ---
+async function searchBarcode(code){
+  try{
+    const { data, error } = await supabase.from('products').select('*').eq('barcode', code).single();
+    if(error){ alert("Not found"); return; }
+
+    document.getElementById("sBarcode").textContent = data.barcode;
+    document.getElementById("sName").textContent = data.name;
+    document.getElementById("sPrice").textContent = data.price;
+    document.getElementById("sWholesale").textContent = data.wholesale;
+
+    document.getElementById("searchModal").style.display="block";
+  }catch(e){ console.error(e); }
+}
+function closeSearchModal(){ document.getElementById("searchModal").style.display="none"; }
+
+// --- INIT ---
+fetchProducts();
+</script>
+
+</body>
+</html>
