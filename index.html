@@ -1,64 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Barcode Scanner App</title>
-    <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
-    <style>
-        body { font-family: Arial; padding: 20px; }
-        #scanner { width: 100%; height: 350px; border: 1px solid #ccc; margin-bottom: 20px; }
-        button { padding: 10px 18px; font-size: 16px; margin: 4px; }
+<meta charset="UTF-8">
+<title>Barcode Scanner App</title>
+<script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
 
-        #popup, #searchModal, #editModal {
-            display:none; position:fixed; top:20%; left:10%;
-            background:white; padding:20px; border:1px solid black;
-            width:80%; z-index:1000; box-shadow:0 0 10px rgba(0,0,0,0.3);
-        }
+<style>
+body { font-family: Arial; padding: 20px; }
+#scanner { width: 100%; height: 350px; border: 1px solid #ccc; margin-bottom: 20px; }
+button { padding: 10px 18px; font-size: 16px; margin: 4px; }
 
-        input { width: 100%; margin-bottom: 8px; padding: 6px; font-size: 16px; }
-    </style>
+/* MODALS */
+.modal {
+    display:none;
+    position:fixed;
+    top:10%;
+    left:5%;
+    width:90%;
+    background:white;
+    padding:20px;
+    border:1px solid black;
+    z-index:1000;
+    box-shadow:0 0 10px rgba(0,0,0,0.3);
+    max-height:70%;
+    overflow:auto;
+}
+
+input {
+    width:100%;
+    margin-bottom:8px;
+    padding:6px;
+    font-size:16px;
+}
+</style>
 </head>
+
 <body>
 
 <h2>Barcode Scanner App</h2>
 
 <button id="start-scan">Add Product</button>
 <button id="search-product">Search Product</button>
+<button onclick="openList()">Saved Products</button>
 <button onclick="refreshPage()">Refresh</button>
 
 <div id="scanner"></div>
 
+<!-- ADD -->
+<div id="popup" class="modal">
+<label>ProdName: <input type="text" id="prodName"></label>
+<label>Price: <input type="number" id="price"></label>
+<label>Wholesale: <input type="number" id="wholesale"></label>
+<button onclick="saveProduct()">Save</button>
+<button onclick="closePopup()">Cancel</button>
+</div>
+
+<!-- EDIT -->
+<div id="editModal" class="modal">
+<h3>Edit Product</h3>
+<label>Name: <input id="editName"></label>
+<label>Price: <input id="editPrice" type="number"></label>
+<label>Wholesale: <input id="editWholesale" type="number"></label>
+<button onclick="updateProduct()">Update</button>
+<button onclick="closeEdit()">Cancel</button>
+</div>
+
+<!-- SEARCH -->
+<div id="searchModal" class="modal">
+<h3>Product Found</h3>
+<p>Barcode: <span id="sBarcode"></span></p>
+<p>Name: <span id="sName"></span></p>
+<p>Price: <span id="sPrice"></span></p>
+<p>Wholesale: <span id="sWholesale"></span></p>
+<button onclick="closeSearchModal()">Close</button>
+</div>
+
+<!-- PRODUCT LIST MODAL -->
+<div id="listModal" class="modal">
 <h3>Saved Products</h3>
-<button onclick="deleteEmptyProducts()">Delete Empty Products</button>
+<button onclick="deleteEmptyProducts()">Delete Empty</button>
 <ul id="product-list"></ul>
-
-<!-- Add Product -->
-<div id="popup">
-    <label>ProdName: <input type="text" id="prodName"/></label>
-    <label>Price: <input type="number" id="price"/></label>
-    <label>WholesalePrice: <input type="number" id="wholesale"/></label>
-    <button onclick="saveProduct()">Save</button>
-    <button onclick="closePopup()">Cancel</button>
-</div>
-
-<!-- Edit Product -->
-<div id="editModal">
-    <h3>Edit Product</h3>
-    <label>ProdName: <input type="text" id="editName"/></label>
-    <label>Price: <input type="number" id="editPrice"/></label>
-    <label>WholesalePrice: <input type="number" id="editWholesale"/></label>
-    <button onclick="updateProduct()">Update</button>
-    <button onclick="closeEdit()">Cancel</button>
-</div>
-
-<!-- Search Modal -->
-<div id="searchModal">
-    <h3>Product Found</h3>
-    <p>Barcode: <span id="sBarcode"></span></p>
-    <p>Name: <span id="sName"></span></p>
-    <p>Price: <span id="sPrice"></span></p>
-    <p>Wholesale: <span id="sWholesale"></span></p>
-    <button onclick="closeSearchModal()">Close</button>
+<button onclick="closeList()">Close</button>
 </div>
 
 <script>
@@ -68,33 +90,38 @@ let searchMode = false;
 let lastScan = 0;
 let editIndex = null;
 
-// Refresh
-function refreshPage() {
-    location.reload();
+// REFRESH
+function refreshPage(){ location.reload(); }
+
+// OPEN LIST
+function openList(){
+    renderProducts();
+    document.getElementById("listModal").style.display = "block";
+}
+function closeList(){
+    document.getElementById("listModal").style.display = "none";
 }
 
-// Render
-function renderProducts() {
+// RENDER LIST
+function renderProducts(){
     const list = document.getElementById("product-list");
     list.innerHTML = "";
 
-    products.forEach((p, index) => {
+    products.forEach((p,index)=>{
         const li = document.createElement("li");
         li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale}`;
 
-        // DELETE
+        const editBtn = document.createElement("button");
+        editBtn.textContent="Edit";
+        editBtn.onclick=()=>openEdit(index);
+
         const delBtn = document.createElement("button");
-        delBtn.textContent = "Delete";
-        delBtn.onclick = () => {
-            products.splice(index, 1);
-            localStorage.setItem("products", JSON.stringify(products));
+        delBtn.textContent="Delete";
+        delBtn.onclick=()=>{
+            products.splice(index,1);
+            localStorage.setItem("products",JSON.stringify(products));
             renderProducts();
         };
-
-        // EDIT
-        const editBtn = document.createElement("button");
-        editBtn.textContent = "Edit";
-        editBtn.onclick = () => openEdit(index);
 
         li.appendChild(editBtn);
         li.appendChild(delBtn);
@@ -102,137 +129,114 @@ function renderProducts() {
     });
 }
 
-// Delete empty
-function deleteEmptyProducts() {
-    products = products.filter(p => p.name || p.price || p.wholesale);
-    localStorage.setItem("products", JSON.stringify(products));
+// DELETE EMPTY
+function deleteEmptyProducts(){
+    products = products.filter(p=>p.name||p.price||p.wholesale);
+    localStorage.setItem("products",JSON.stringify(products));
     renderProducts();
 }
 
-// Scanner
-function startScanner() {
+// SCANNER
+function startScanner(){
     Quagga.init({
-        inputStream: {
-            type: "LiveStream",
-            target: document.querySelector('#scanner'),
-            constraints: {
-                facingMode: "environment",
-                width: 1280,
-                height: 720,
-                advanced: [{ zoom: 2 }]
+        inputStream:{
+            type:"LiveStream",
+            target:document.querySelector('#scanner'),
+            constraints:{
+                facingMode:"environment",
+                width:1280,
+                height:720,
+                advanced:[{zoom:2}]
             }
         },
-        decoder: {
-            readers: ["ean_reader", "ean_8_reader", "upc_reader"]
-        }
-    }, function(err) {
-        if (err) return console.error(err);
+        decoder:{ readers:["ean_reader","ean_8_reader","upc_reader"] }
+    },err=>{
+        if(err) return console.error(err);
         Quagga.start();
     });
 
-    Quagga.onDetected(function(result) {
-        const now = Date.now();
-        if (now - lastScan < 1500) return;
+    Quagga.onDetected(result=>{
+        const now=Date.now();
+        if(now-lastScan<1500) return;
+        lastScan=now;
 
-        lastScan = now;
-        const code = result.codeResult.code;
+        const code=result.codeResult.code;
         Quagga.stop();
 
-        if (searchMode) {
+        if(searchMode){
             searchBarcode(code);
         } else {
-            currentBarcode = code;
+            currentBarcode=code;
             openPopup();
         }
     });
 }
 
-// Buttons
-document.getElementById("start-scan").onclick = () => {
-    searchMode = false;
+// BUTTONS
+document.getElementById("start-scan").onclick=()=>{
+    searchMode=false;
+    startScanner();
+};
+document.getElementById("search-product").onclick=()=>{
+    searchMode=true;
     startScanner();
 };
 
-document.getElementById("search-product").onclick = () => {
-    searchMode = true;
-    startScanner();
-};
+// ADD
+function openPopup(){ document.getElementById("popup").style.display="block"; }
+function closePopup(){ document.getElementById("popup").style.display="none"; }
 
-// Add popup
-function openPopup() {
-    document.getElementById("popup").style.display = "block";
-}
+function saveProduct(){
+    const name=prodName.value;
+    const price=price.value;
+    const wholesale=wholesale.value;
 
-function closePopup() {
-    document.getElementById("popup").style.display = "none";
-}
-
-// Save product (PRIMARY KEY)
-function saveProduct() {
-    const name = document.getElementById("prodName").value;
-    const price = document.getElementById("price").value;
-    const wholesale = document.getElementById("wholesale").value;
-
-    const exists = products.some(p => p.barcode === currentBarcode);
-
-    if (exists) {
+    if(products.some(p=>p.barcode===currentBarcode)){
         alert("⚠️ Product already exists!");
         closePopup();
         return;
     }
 
-    products.push({ barcode: currentBarcode, name, price, wholesale });
-    localStorage.setItem("products", JSON.stringify(products));
-    renderProducts();
+    products.push({barcode:currentBarcode,name,price,wholesale});
+    localStorage.setItem("products",JSON.stringify(products));
     closePopup();
 }
 
-// EDIT FUNCTIONS
-function openEdit(index) {
-    editIndex = index;
-    const p = products[index];
-
-    document.getElementById("editName").value = p.name;
-    document.getElementById("editPrice").value = p.price;
-    document.getElementById("editWholesale").value = p.wholesale;
-
-    document.getElementById("editModal").style.display = "block";
+// EDIT
+function openEdit(i){
+    editIndex=i;
+    const p=products[i];
+    editName.value=p.name;
+    editPrice.value=p.price;
+    editWholesale.value=p.wholesale;
+    document.getElementById("editModal").style.display="block";
 }
+function closeEdit(){ document.getElementById("editModal").style.display="none"; }
 
-function closeEdit() {
-    document.getElementById("editModal").style.display = "none";
-}
+function updateProduct(){
+    products[editIndex].name=editName.value;
+    products[editIndex].price=editPrice.value;
+    products[editIndex].wholesale=editWholesale.value;
 
-function updateProduct() {
-    products[editIndex].name = document.getElementById("editName").value;
-    products[editIndex].price = document.getElementById("editPrice").value;
-    products[editIndex].wholesale = document.getElementById("editWholesale").value;
-
-    localStorage.setItem("products", JSON.stringify(products));
+    localStorage.setItem("products",JSON.stringify(products));
     renderProducts();
     closeEdit();
 }
 
-// Search
-function searchBarcode(code) {
-    const product = products.find(p => p.barcode === code);
-
-    if (product) {
-        document.getElementById("sBarcode").textContent = product.barcode;
-        document.getElementById("sName").textContent = product.name;
-        document.getElementById("sPrice").textContent = product.price;
-        document.getElementById("sWholesale").textContent = product.wholesale;
-        document.getElementById("searchModal").style.display = "block";
-    } else {
-        alert("Product not found");
-    }
+// SEARCH
+function searchBarcode(code){
+    const p=products.find(x=>x.barcode===code);
+    if(p){
+        sBarcode.textContent=p.barcode;
+        sName.textContent=p.name;
+        sPrice.textContent=p.price;
+        sWholesale.textContent=p.wholesale;
+        document.getElementById("searchModal").style.display="block";
+    } else alert("Not found");
 }
-
-function closeSearchModal() {
-    document.getElementById("searchModal").style.display = "none";
+function closeSearchModal(){
+    document.getElementById("searchModal").style.display="none";
 }
-
-renderProducts();
 </script>
 
 </body>
