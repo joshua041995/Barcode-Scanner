@@ -8,155 +8,178 @@
         body { font-family: Arial; padding: 20px; }
         #scanner { width: 100%; height: 350px; border: 1px solid #ccc; margin-bottom: 20px; }
         button { padding: 10px 18px; font-size: 16px; margin: 4px; }
-        #popup, #searchModal { display:none; position:fixed; top:20%; left:10%; 
-            background:white; padding:20px; border:1px solid black; z-index:1000; width:80%; box-shadow:0 0 10px rgba(0,0,0,0.3); }
+        #popup, #searchModal {
+            display:none; position:fixed; top:20%; left:10%;
+            background:white; padding:20px; border:1px solid black;
+            width:80%; z-index:1000; box-shadow:0 0 10px rgba(0,0,0,0.3);
+        }
         #popup input { width: 100%; margin-bottom: 8px; padding: 6px; font-size: 16px; }
-        #searchModal p { margin: 6px 0; }
     </style>
 </head>
 <body>
-    <h2>Barcode Scanner App</h2>
-    <button id="start-scan">Add Product</button>
-    <button id="search-product">Search Product</button>
-    <div id="scanner"></div>
 
-    <h3>Saved Products</h3>
-    <button onclick="deleteEmptyProducts()">Delete Empty Products</button>
-    <ul id="product-list"></ul>
+<h2>Barcode Scanner App</h2>
+<button id="start-scan">Add Product</button>
+<button id="search-product">Search Product</button>
 
-    <!-- Add Product Popup -->
-    <div id="popup">
-        <label>ProdName: <input type="text" id="prodName"/></label><br/>
-        <label>Price: <input type="number" id="price"/></label><br/>
-        <label>WholesalePrice: <input type="number" id="wholesale"/></label><br/>
-        <button onclick="saveProduct()">Save</button>
-        <button onclick="closePopup()">Cancel</button>
-    </div>
+<div id="scanner"></div>
 
-    <!-- Search Result Modal -->
-    <div id="searchModal">
-        <h3>Product Found</h3>
-        <p>Barcode: <span id="sBarcode"></span></p>
-        <p>Product Name: <span id="sName"></span></p>
-        <p>Price: <span id="sPrice"></span></p>
-        <p>Wholesale Price: <span id="sWholesale"></span></p>
-        <button onclick="closeSearchModal()">Close</button>
-    </div>
+<h3>Saved Products</h3>
+<button onclick="deleteEmptyProducts()">Delete Empty Products</button>
+<ul id="product-list"></ul>
 
-    <script>
-        let products = JSON.parse(localStorage.getItem("products")) || [];
-        let currentBarcode = "";
-        let searchMode = false;
+<!-- Add Product Popup -->
+<div id="popup">
+    <label>ProdName: <input type="text" id="prodName"/></label><br/>
+    <label>Price: <input type="number" id="price"/></label><br/>
+    <label>WholesalePrice: <input type="number" id="wholesale"/></label><br/>
+    <button onclick="saveProduct()">Save</button>
+    <button onclick="closePopup()">Cancel</button>
+</div>
 
-        function renderProducts() {
-            const list = document.getElementById("product-list");
-            list.innerHTML = "";
-            products.forEach((p, index) => {
-                const li = document.createElement("li");
-                li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale} `;
+<!-- Search Modal -->
+<div id="searchModal">
+    <h3>Product Found</h3>
+    <p>Barcode: <span id="sBarcode"></span></p>
+    <p>Name: <span id="sName"></span></p>
+    <p>Price: <span id="sPrice"></span></p>
+    <p>Wholesale: <span id="sWholesale"></span></p>
+    <button onclick="closeSearchModal()">Close</button>
+</div>
 
-                // Delete button for each product
-                const delBtn = document.createElement("button");
-                delBtn.textContent = "Delete";
-                delBtn.onclick = () => {
-                    products.splice(index, 1);
-                    localStorage.setItem("products", JSON.stringify(products));
-                    renderProducts();
-                };
+<script>
+let products = JSON.parse(localStorage.getItem("products")) || [];
+let currentBarcode = "";
+let searchMode = false;
+let lastScan = 0;
 
-                li.appendChild(delBtn);
-                list.appendChild(li);
-            });
-        }
+// Render list
+function renderProducts() {
+    const list = document.getElementById("product-list");
+    list.innerHTML = "";
 
-        function deleteEmptyProducts() {
-            products = products.filter(p => p.name || p.price || p.wholesale);
+    products.forEach((p, index) => {
+        const li = document.createElement("li");
+        li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale}`;
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "Delete";
+        delBtn.onclick = () => {
+            products.splice(index, 1);
             localStorage.setItem("products", JSON.stringify(products));
             renderProducts();
-        }
+        };
 
-        function startQuagga() {
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.querySelector('#scanner'),
-                    constraints: {
-                        facingMode: "environment", // back camera
-                        width: 640,
-                        height: 480
-                    }
-                },
-                decoder: {
-                    readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader"]
-                }
-            }, function(err) {
-                if (err) { console.error(err); return; }
-                Quagga.start();
-            });
+        li.appendChild(delBtn);
+        list.appendChild(li);
+    });
+}
 
-            Quagga.onDetected(function(result) {
-                const code = result.codeResult.code;
-                Quagga.stop();
-                if(searchMode){
-                    searchBarcode(code);
-                } else {
-                    currentBarcode = code;
-                    openPopup();
-                }
-            });
-        }
+// Delete empty
+function deleteEmptyProducts() {
+    products = products.filter(p => p.name || p.price || p.wholesale);
+    localStorage.setItem("products", JSON.stringify(products));
+    renderProducts();
+}
 
-        document.getElementById("start-scan").addEventListener("click", () => {
-            searchMode = false;
-            startQuagga();
-        });
-
-        document.getElementById("search-product").addEventListener("click", () => {
-            searchMode = true;
-            startQuagga();
-        });
-
-        function openPopup() {
-            document.getElementById("popup").style.display = "block";
-            document.getElementById("prodName").value = "";
-            document.getElementById("price").value = "";
-            document.getElementById("wholesale").value = "";
-        }
-
-        function closePopup() {
-            document.getElementById("popup").style.display = "none";
-        }
-
-        function saveProduct() {
-            const name = document.getElementById("prodName").value;
-            const price = document.getElementById("price").value;
-            const wholesale = document.getElementById("wholesale").value;
-
-            products.push({ barcode: currentBarcode, name, price, wholesale });
-            localStorage.setItem("products", JSON.stringify(products));
-            renderProducts();
-            closePopup();
-        }
-
-        function searchBarcode(code){
-            const product = products.find(p => p.barcode === code);
-            if(product){
-                document.getElementById("sBarcode").textContent = product.barcode;
-                document.getElementById("sName").textContent = product.name;
-                document.getElementById("sPrice").textContent = product.price;
-                document.getElementById("sWholesale").textContent = product.wholesale;
-                document.getElementById("searchModal").style.display = "block";
-            } else {
-                alert("Product not found!");
+// Start scanner
+function startScanner() {
+    Quagga.init({
+        inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: document.querySelector('#scanner'),
+            constraints: {
+                facingMode: "environment",
+                width: 1280,
+                height: 720,
+                advanced: [{ zoom: 2 }]
             }
+        },
+        locator: {
+            patchSize: "medium",
+            halfSample: true
+        },
+        numOfWorkers: 2,
+        decoder: {
+            readers: ["ean_reader", "ean_8_reader", "upc_reader"]
         }
+    }, function(err) {
+        if (err) { console.error(err); return; }
+        Quagga.start();
+    });
 
-        function closeSearchModal() {
-            document.getElementById("searchModal").style.display = "none";
+    Quagga.onDetected(function(result) {
+        const now = Date.now();
+        if (now - lastScan < 1500) return;
+
+        lastScan = now;
+        const code = result.codeResult.code;
+
+        Quagga.stop();
+
+        if (searchMode) {
+            searchBarcode(code);
+        } else {
+            currentBarcode = code;
+            openPopup();
         }
+    });
+}
 
-        renderProducts();
-    </script>
+// Buttons
+document.getElementById("start-scan").onclick = () => {
+    searchMode = false;
+    startScanner();
+};
+
+document.getElementById("search-product").onclick = () => {
+    searchMode = true;
+    startScanner();
+};
+
+// Popup
+function openPopup() {
+    document.getElementById("popup").style.display = "block";
+}
+
+function closePopup() {
+    document.getElementById("popup").style.display = "none";
+}
+
+// Save product
+function saveProduct() {
+    const name = document.getElementById("prodName").value;
+    const price = document.getElementById("price").value;
+    const wholesale = document.getElementById("wholesale").value;
+
+    products.push({ barcode: currentBarcode, name, price, wholesale });
+    localStorage.setItem("products", JSON.stringify(products));
+    renderProducts();
+    closePopup();
+}
+
+// Search
+function searchBarcode(code) {
+    const product = products.find(p => p.barcode === code);
+
+    if (product) {
+        document.getElementById("sBarcode").textContent = product.barcode;
+        document.getElementById("sName").textContent = product.name;
+        document.getElementById("sPrice").textContent = product.price;
+        document.getElementById("sWholesale").textContent = product.wholesale;
+        document.getElementById("searchModal").style.display = "block";
+    } else {
+        alert("Product not found");
+    }
+}
+
+function closeSearchModal() {
+    document.getElementById("searchModal").style.display = "none";
+}
+
+renderProducts();
+</script>
+
 </body>
 </html>
