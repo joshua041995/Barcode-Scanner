@@ -6,11 +6,12 @@
     <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
     <style>
         body { font-family: Arial; padding: 20px; }
-        #scanner { width: 100%; height: 250px; border: 1px solid #ccc; margin-bottom: 20px; }
-        button { padding: 8px 16px; font-size: 14px; margin: 2px; }
-        #popup, #searchModal { display:none; position:fixed; top:20%; left:10%; background:white; 
-                 padding:20px; border:1px solid black; z-index:1000; }
-        #popup input { width: 100%; margin-bottom: 8px; padding: 6px; }
+        #scanner { width: 100%; height: 350px; border: 1px solid #ccc; margin-bottom: 20px; }
+        button { padding: 10px 18px; font-size: 16px; margin: 4px; }
+        #popup, #searchModal { display:none; position:fixed; top:20%; left:10%; 
+            background:white; padding:20px; border:1px solid black; z-index:1000; width:80%; box-shadow:0 0 10px rgba(0,0,0,0.3); }
+        #popup input { width: 100%; margin-bottom: 8px; padding: 6px; font-size: 16px; }
+        #searchModal p { margin: 6px 0; }
     </style>
 </head>
 <body>
@@ -53,6 +54,8 @@
             products.forEach((p, index) => {
                 const li = document.createElement("li");
                 li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale} `;
+
+                // Delete button for each product
                 const delBtn = document.createElement("button");
                 delBtn.textContent = "Delete";
                 delBtn.onclick = () => {
@@ -60,6 +63,7 @@
                     localStorage.setItem("products", JSON.stringify(products));
                     renderProducts();
                 };
+
                 li.appendChild(delBtn);
                 list.appendChild(li);
             });
@@ -78,9 +82,9 @@
                     type: "LiveStream",
                     target: document.querySelector('#scanner'),
                     constraints: {
-                        facingMode: { exact: "environment" },
-                        width: 400,
-                        height: 300
+                        facingMode: "environment", // back camera
+                        width: 640,
+                        height: 480
                     }
                 },
                 decoder: {
@@ -128,13 +132,13 @@
             const name = document.getElementById("prodName").value;
             const price = document.getElementById("price").value;
             const wholesale = document.getElementById("wholesale").value;
+
             products.push({ barcode: currentBarcode, name, price, wholesale });
             localStorage.setItem("products", JSON.stringify(products));
             renderProducts();
             closePopup();
         }
 
-        // Search function
         function searchBarcode(code){
             const product = products.find(p => p.barcode === code);
             if(product){
