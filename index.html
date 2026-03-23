@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App</title>
+<title>Mobile-Friendly Barcode Scanner - Supabase</title>
 <script src="https://unpkg.com/quagga@0.12.1/dist/quagga.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 
 <style>
 body { font-family: Arial; padding: 20px; }
-#scanner { width: 100%; height: 350px; border: 1px solid #ccc; margin-bottom: 20px; }
+#scanner { width: 100%; height: 350px; border: 1px solid #ccc; margin-bottom: 20px; position: relative; }
+#scanner .guide { border:2px dashed red; width:80%; height:50px; position:absolute; top:50%; left:10%; transform:translateY(-50%); }
+
 button { padding: 10px 18px; font-size: 16px; margin: 4px; }
 
 /* MODALS */
@@ -37,14 +40,14 @@ input {
 
 <body>
 
-<h2>Barcode Scanner App</h2>
+<h2>Mobile-Friendly Barcode Scanner - Supabase</h2>
 
 <button id="start-scan">Add Product</button>
 <button id="search-product">Search Product</button>
 <button onclick="openList()">Saved Products</button>
 <button onclick="refreshPage()">Refresh</button>
 
-<div id="scanner"></div>
+<div id="scanner"><div class="guide"></div></div>
 
 <!-- ADD MODAL -->
 <div id="popup" class="modal">
@@ -84,25 +87,37 @@ input {
 </div>
 
 <script>
-let products = JSON.parse(localStorage.getItem("products")) || [];
+// ---------------- SUPABASE INIT ----------------
+const SUPABASE_URL = 'https://sdmhthsjkivujmdlaepv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_KDqLJlPRj0A6MIj1c-XMiw_agu52AzC';
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---------------- GLOBAL ----------------
+let products = [];
 let currentBarcode = "";
 let searchMode = false;
 let lastScan = 0;
 let editIndex = null;
 
-// REFRESH
+// ---------------- REFRESH ----------------
 function refreshPage(){ location.reload(); }
 
-// OPEN LIST
-function openList(){
+// ---------------- FETCH PRODUCTS ----------------
+async function fetchProducts(){
+    const { data, error } = await supabase.from('products').select('*');
+    if(error) return console.error(error);
+    products = data || [];
     renderProducts();
-    document.getElementById("listModal").style.display = "block";
-}
-function closeList(){
-    document.getElementById("listModal").style.display = "none";
 }
 
-// RENDER PRODUCTS
+// ---------------- OPEN / CLOSE LIST ----------------
+function openList(){
+    fetchProducts();
+    document.getElementById("listModal").style.display = "block";
+}
+function closeList(){ document.getElementById("listModal").style.display = "none"; }
+
+// ---------------- RENDER PRODUCTS ----------------
 function renderProducts(){
     const list = document.getElementById("product-list");
     list.innerHTML = "";
@@ -117,10 +132,10 @@ function renderProducts(){
 
         const delBtn = document.createElement("button");
         delBtn.textContent="Delete";
-        delBtn.onclick=()=>{
-            products.splice(index,1);
-            localStorage.setItem("products",JSON.stringify(products));
-            renderProducts();
+        delBtn.onclick=async ()=>{
+            const { error } = await supabase.from('products').delete().eq('barcode', p.barcode);
+            if(error) return alert(error.message);
+            fetchProducts();
         };
 
         li.appendChild(editBtn);
@@ -129,28 +144,32 @@ function renderProducts(){
     });
 }
 
-// DELETE EMPTY
-function deleteEmptyProducts(){
-    products = products.filter(p=>p.name||p.price||p.wholesale);
-    localStorage.setItem("products",JSON.stringify(products));
-    renderProducts();
+// ---------------- DELETE EMPTY ----------------
+async function deleteEmptyProducts(){
+    for(const p of products){
+        if(!p.name && !p.price && !p.wholesale){
+            await supabase.from('products').delete().eq('barcode', p.barcode);
+        }
+    }
+    fetchProducts();
 }
 
-// SCANNER
+// ---------------- SCANNER ----------------
 function startScanner(){
     Quagga.init({
         inputStream:{
             type:"LiveStream",
             target:document.querySelector('#scanner'),
             constraints:{
-                facingMode:"environment",
-                width:1280,
-                height:720,
-                advanced:[{zoom:2}]
+                facingMode: "environment",
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                advanced:[{zoom:2}, {focusMode: "continuous"}]
             }
         },
-        decoder:{ readers:["ean_reader","ean_8_reader","upc_reader"] }
-    },err=>{
+        decoder:{ readers:["ean_reader","ean_8_reader","upc_reader"] },
+        locate: true
+    }, err=>{
         if(err) return console.error(err);
         Quagga.start();
     });
@@ -172,7 +191,7 @@ function startScanner(){
     });
 }
 
-// BUTTONS
+// ---------------- BUTTONS ----------------
 document.getElementById("start-scan").onclick=()=>{
     searchMode=false;
     startScanner();
@@ -182,89 +201,77 @@ document.getElementById("search-product").onclick=()=>{
     startScanner();
 };
 
-// ADD MODAL
+// ---------------- ADD PRODUCT ----------------
 function openPopup(){ document.getElementById("popup").style.display="block"; }
 function closePopup(){ document.getElementById("popup").style.display="none"; }
 
-// SAVE PRODUCT
-function saveProduct(){
+async function saveProduct(){
     const name = document.getElementById("prodName").value;
     const priceVal = document.getElementById("price").value;
     const wholesaleVal = document.getElementById("wholesale").value;
 
-    if(!name){
-        alert("Enter product name");
-        return;
-    }
+    if(!name){ alert("Enter product name"); return; }
 
-    if(products.some(p=>p.barcode===currentBarcode)){
-        alert("⚠️ Product already exists!");
-        closePopup();
-        return;
-    }
+    const { data: existing } = await supabase.from('products').select('*').eq('barcode', currentBarcode).single();
+    if(existing){ alert("⚠️ Product already exists!"); closePopup(); return; }
 
-    products.push({
-        barcode: currentBarcode,
-        name: name,
-        price: priceVal,
-        wholesale: wholesaleVal
-    });
+    const { error } = await supabase.from('products')
+        .insert([{ barcode: currentBarcode, name, price: priceVal, wholesale: wholesaleVal }]);
+    if(error) return alert(error.message);
 
-    localStorage.setItem("products",JSON.stringify(products));
-
-    // CLEAR INPUTS
     document.getElementById("prodName").value="";
     document.getElementById("price").value="";
     document.getElementById("wholesale").value="";
 
     closePopup();
     alert("✅ Saved!");
+    fetchProducts();
 }
 
-// EDIT
+// ---------------- EDIT PRODUCT ----------------
 function openEdit(i){
     editIndex=i;
     const p = products[i];
-
-    // Fill inputs
     document.getElementById("editName").value = p.name;
     document.getElementById("editPrice").value = p.price;
     document.getElementById("editWholesale").value = p.wholesale;
 
-    // CLOSE LIST MODAL
     document.getElementById("listModal").style.display="none";
-
-    // OPEN EDIT MODAL
     document.getElementById("editModal").style.display="block";
 }
-
 function closeEdit(){ document.getElementById("editModal").style.display="none"; }
 
-function updateProduct(){
-    products[editIndex].name=document.getElementById("editName").value;
-    products[editIndex].price=document.getElementById("editPrice").value;
-    products[editIndex].wholesale=document.getElementById("editWholesale").value;
+async function updateProduct(){
+    const name = document.getElementById("editName").value;
+    const priceVal = document.getElementById("editPrice").value;
+    const wholesaleVal = document.getElementById("editWholesale").value;
 
-    localStorage.setItem("products",JSON.stringify(products));
+    const { error } = await supabase.from('products')
+        .update({ name, price: priceVal, wholesale: wholesaleVal })
+        .eq('barcode', products[editIndex].barcode);
+    if(error) return alert(error.message);
+
     closeEdit();
-
-    // REOPEN LIST MODAL TO SEE CHANGES
+    fetchProducts();
     openList();
 }
 
-// SEARCH
-function searchBarcode(code){
-    const p=products.find(x=>x.barcode===code);
-    if(p){
-        sBarcode.textContent=p.barcode;
-        sName.textContent=p.name;
-        sPrice.textContent=p.price;
-        sWholesale.textContent=p.wholesale;
-        document.getElementById("searchModal").style.display="block";
-    } else alert("Not found");
+// ---------------- SEARCH ----------------
+async function searchBarcode(code){
+    const { data, error } = await supabase.from('products')
+        .select('*').eq('barcode', code).single();
+    if(error || !data){ alert("Not found"); return; }
+
+    sBarcode.textContent = data.barcode;
+    sName.textContent = data.name;
+    sPrice.textContent = data.price;
+    sWholesale.textContent = data.wholesale;
+    document.getElementById("searchModal").style.display="block";
 }
 function closeSearchModal(){ document.getElementById("searchModal").style.display="none"; }
 
+// ---------------- INITIAL LOAD ----------------
+fetchProducts();
 </script>
 
 </body>
