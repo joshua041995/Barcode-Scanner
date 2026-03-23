@@ -15,9 +15,7 @@ body {
     padding:15px;
 }
 
-h2 {
-    text-align:center;
-}
+h2 { text-align:center; }
 
 /* BUTTONS */
 .top-buttons {
@@ -26,13 +24,11 @@ h2 {
     gap:10px;
     margin:15px 0;
 }
-
 button {
     flex:1;
     padding:12px;
     border:none;
     border-radius:10px;
-    font-size:14px;
     font-weight:bold;
     background:#4CAF50;
     color:white;
@@ -57,8 +53,6 @@ button {
     border-radius:20px 20px 0 0;
     padding:20px;
     box-shadow:0 -4px 10px rgba(0,0,0,0.3);
-    max-height:80%;
-    overflow:auto;
 }
 
 /* INPUTS */
@@ -83,7 +77,7 @@ input {
 .small-btn {
     padding:6px 10px;
     font-size:12px;
-    margin-left:5px;
+    margin-top:5px;
     background:#2196F3;
 }
 .delete-btn { background:#f44336; }
@@ -143,122 +137,161 @@ input {
 
 <script>
 // SUPABASE
-const supabase = supabase.createClient(
+const supabaseClient = supabase.createClient(
 'https://sdmhthsjkivujmdlaepv.supabase.co',
 'sb_publishable_KDqLJlPRj0A6MIj1c-XMiw_agu52AzC'
 );
 
-let products=[], currentBarcode="", searchMode=false, html5QrCode, editIndex;
+let products = [];
+let currentBarcode = "";
+let searchMode = false;
+let html5QrCode;
+let editIndex = null;
 
 // REFRESH
 function refreshPage(){ location.reload(); }
 
 // FETCH
 async function fetchProducts(){
-    const { data } = await supabase.from('products').select('*');
-    products=data||[];
+    const { data } = await supabaseClient.from('products').select('*');
+    products = data || [];
     renderProducts();
 }
 
 // LIST
-function openList(){ fetchProducts(); listModal.style.display="block"; }
-function closeList(){ listModal.style.display="none"; }
+function openList(){
+    fetchProducts();
+    document.getElementById("listModal").style.display = "block";
+}
+function closeList(){
+    document.getElementById("listModal").style.display = "none";
+}
 
 // RENDER
 function renderProducts(){
-    product-list.innerHTML="";
+    const list = document.getElementById("product-list");
+    list.innerHTML = "";
+
     products.forEach((p,i)=>{
-        let li=document.createElement("li");
+        let li = document.createElement("li");
         li.innerHTML = `
         <b>${p.name}</b><br>
         ${p.barcode}<br>
-        ₱${p.price} | ₱${p.wholesale}
-        <br>
+        ₱${p.price} | ₱${p.wholesale}<br>
         <button class="small-btn" onclick="openEdit(${i})">Edit</button>
         <button class="small-btn delete-btn" onclick="deleteProduct('${p.barcode}')">Delete</button>
         `;
-        product-list.appendChild(li);
+        list.appendChild(li);
     });
 }
 
 // DELETE
 async function deleteProduct(barcode){
-    await supabase.from('products').delete().eq('barcode', barcode);
+    await supabaseClient.from('products').delete().eq('barcode', barcode);
     fetchProducts();
 }
 
 // SCANNER
 function startScanner(mode){
-    searchMode=mode;
-    scanner.innerHTML="";
-    html5QrCode=new Html5Qrcode("scanner");
+    searchMode = mode;
+    document.getElementById("scanner").innerHTML = "";
+
+    html5QrCode = new Html5Qrcode("scanner");
 
     Html5Qrcode.getCameras().then(devices=>{
-        html5QrCode.start(devices[0].id,{fps:10,qrbox:250},
-        txt=>{
-            html5QrCode.stop();
-            currentBarcode=txt;
-            manualBarcode.value=txt;
-            searchMode?searchBarcode(txt):openPopup();
-        });
+        if(!devices.length){ alert("No camera"); return; }
+
+        html5QrCode.start(
+            devices[0].id,
+            { fps:10, qrbox:250 },
+            (text)=>{
+                html5QrCode.stop();
+                currentBarcode = text;
+                document.getElementById("manualBarcode").value = text;
+
+                if(searchMode){
+                    searchBarcode(text);
+                } else {
+                    openPopup();
+                }
+            }
+        );
     });
 }
 
 // ADD
-function openPopup(){ popup.style.display="block"; }
-function closePopup(){ popup.style.display="none"; }
+function openPopup(){ document.getElementById("popup").style.display="block"; }
+function closePopup(){ document.getElementById("popup").style.display="none"; }
 
 async function saveProduct(){
-    let barcode=currentBarcode||manualBarcode.value;
-    let name=prodName.value;
-    let price=price.value;
-    let wholesale=wholesale.value;
+    let barcode = currentBarcode || document.getElementById("manualBarcode").value;
+    let name = document.getElementById("prodName").value;
+    let price = document.getElementById("price").value;
+    let wholesale = document.getElementById("wholesale").value;
 
-    if(!barcode||!name){ alert("Missing data"); return; }
+    if(!barcode || !name){ alert("Missing data"); return; }
 
-    let { data:exist } = await supabase.from('products').select('*').eq('barcode',barcode).single();
+    let { data: exist } = await supabaseClient.from('products')
+        .select('*').eq('barcode', barcode).single();
+
     if(exist){ alert("Already exists"); return; }
 
-    await supabase.from('products').insert([{barcode,name,price,wholesale}]);
+    await supabaseClient.from('products')
+        .insert([{ barcode, name, price, wholesale }]);
 
-    popup.style.display="none";
+    closePopup();
     fetchProducts();
 }
 
 // EDIT
 function openEdit(i){
-    editIndex=i;
-    let p=products[i];
-    editName.value=p.name;
-    editPrice.value=p.price;
-    editWholesale.value=p.wholesale;
-    listModal.style.display="none";
-    editModal.style.display="block";
+    editIndex = i;
+    let p = products[i];
+
+    document.getElementById("editName").value = p.name;
+    document.getElementById("editPrice").value = p.price;
+    document.getElementById("editWholesale").value = p.wholesale;
+
+    closeList();
+    document.getElementById("editModal").style.display = "block";
 }
-function closeEdit(){ editModal.style.display="none"; }
+
+function closeEdit(){
+    document.getElementById("editModal").style.display = "none";
+}
 
 async function updateProduct(){
-    await supabase.from('products')
+    await supabaseClient.from('products')
     .update({
-        name:editName.value,
-        price:editPrice.value,
-        wholesale:editWholesale.value
-    }).eq('barcode',products[editIndex].barcode);
+        name: document.getElementById("editName").value,
+        price: document.getElementById("editPrice").value,
+        wholesale: document.getElementById("editWholesale").value
+    })
+    .eq('barcode', products[editIndex].barcode);
 
-    closeEdit(); fetchProducts(); openList();
+    closeEdit();
+    fetchProducts();
+    openList();
 }
 
 // SEARCH
 async function searchBarcode(code){
-    let { data } = await supabase.from('products').select('*').eq('barcode',code).single();
+    let { data } = await supabaseClient.from('products')
+        .select('*').eq('barcode', code).single();
+
     if(!data){ alert("Not found"); return; }
-    sBarcode.textContent=data.barcode;
-    sName.textContent=data.name;
-    sPrice.textContent=data.price;
-    sWholesale.textContent=data.wholesale;
-    searchModal.style.display="block";
+
+    document.getElementById("sBarcode").textContent = data.barcode;
+    document.getElementById("sName").textContent = data.name;
+    document.getElementById("sPrice").textContent = data.price;
+    document.getElementById("sWholesale").textContent = data.wholesale;
+
+    document.getElementById("searchModal").style.display = "block";
 }
-function closeSearchModal(){ searchModal.style.display="none"; }
+
+function closeSearchModal(){
+    document.getElementById("searchModal").style.display = "none";
+}
 
 // INIT
 fetchProducts();
