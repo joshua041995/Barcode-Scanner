@@ -55,12 +55,12 @@ let currentBarcode = "";
 let searchMode = false;
 let lastScan = 0;
 
-// 🔄 Refresh function
+// 🔄 Refresh
 function refreshPage() {
     location.reload();
 }
 
-// Render list
+// 📋 Render list
 function renderProducts() {
     const list = document.getElementById("product-list");
     list.innerHTML = "";
@@ -82,14 +82,14 @@ function renderProducts() {
     });
 }
 
-// Delete empty
+// 🧹 Delete empty
 function deleteEmptyProducts() {
     products = products.filter(p => p.name || p.price || p.wholesale);
     localStorage.setItem("products", JSON.stringify(products));
     renderProducts();
 }
 
-// Start scanner
+// 📷 Start scanner
 function startScanner() {
     Quagga.init({
         inputStream: {
@@ -134,7 +134,7 @@ function startScanner() {
     });
 }
 
-// Buttons
+// 🎯 Buttons
 document.getElementById("start-scan").onclick = () => {
     searchMode = false;
     startScanner();
@@ -145,7 +145,7 @@ document.getElementById("search-product").onclick = () => {
     startScanner();
 };
 
-// Popup
+// 📥 Popup
 function openPopup() {
     document.getElementById("popup").style.display = "block";
 }
@@ -154,11 +154,21 @@ function closePopup() {
     document.getElementById("popup").style.display = "none";
 }
 
-// Save product
+// 💾 Save with PRIMARY KEY check
 function saveProduct() {
     const name = document.getElementById("prodName").value;
     const price = document.getElementById("price").value;
     const wholesale = document.getElementById("wholesale").value;
+
+    // 🔑 Check duplicate barcode
+    const exists = products.some(p => p.barcode === currentBarcode);
+
+    if (exists) {
+        const product = products.find(p => p.barcode === currentBarcode);
+        alert(`⚠️ Product already exists!\n\n${product.name} - ${product.price}`);
+        closePopup();
+        return;
+    }
 
     products.push({ barcode: currentBarcode, name, price, wholesale });
     localStorage.setItem("products", JSON.stringify(products));
@@ -166,7 +176,7 @@ function saveProduct() {
     closePopup();
 }
 
-// Search
+// 🔍 Search
 function searchBarcode(code) {
     const product = products.find(p => p.barcode === code);
 
