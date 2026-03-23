@@ -8,21 +8,22 @@
         body { font-family: Arial; padding: 20px; }
         #scanner { width: 100%; height: 250px; border: 1px solid #ccc; margin-bottom: 20px; }
         button { padding: 8px 16px; font-size: 14px; margin: 2px; }
-        #popup { display:none; position:fixed; top:20%; left:10%; background:white; 
+        #popup, #searchModal { display:none; position:fixed; top:20%; left:10%; background:white; 
                  padding:20px; border:1px solid black; z-index:1000; }
         #popup input { width: 100%; margin-bottom: 8px; padding: 6px; }
     </style>
 </head>
 <body>
     <h2>Barcode Scanner App</h2>
-    <button id="start-scan">Start Scan</button>
+    <button id="start-scan">Add Product</button>
+    <button id="search-product">Search Product</button>
     <div id="scanner"></div>
 
     <h3>Saved Products</h3>
     <button onclick="deleteEmptyProducts()">Delete Empty Products</button>
     <ul id="product-list"></ul>
 
-    <!-- Popup Form -->
+    <!-- Add Product Popup -->
     <div id="popup">
         <label>ProdName: <input type="text" id="prodName"/></label><br/>
         <label>Price: <input type="number" id="price"/></label><br/>
@@ -31,20 +32,27 @@
         <button onclick="closePopup()">Cancel</button>
     </div>
 
+    <!-- Search Result Modal -->
+    <div id="searchModal">
+        <h3>Product Found</h3>
+        <p>Barcode: <span id="sBarcode"></span></p>
+        <p>Product Name: <span id="sName"></span></p>
+        <p>Price: <span id="sPrice"></span></p>
+        <p>Wholesale Price: <span id="sWholesale"></span></p>
+        <button onclick="closeSearchModal()">Close</button>
+    </div>
+
     <script>
         let products = JSON.parse(localStorage.getItem("products")) || [];
         let currentBarcode = "";
+        let searchMode = false;
 
-        // Render products list
         function renderProducts() {
             const list = document.getElementById("product-list");
             list.innerHTML = "";
-
             products.forEach((p, index) => {
                 const li = document.createElement("li");
                 li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale} `;
-
-                // Delete button for each product
                 const delBtn = document.createElement("button");
                 delBtn.textContent = "Delete";
                 delBtn.onclick = () => {
@@ -52,21 +60,18 @@
                     localStorage.setItem("products", JSON.stringify(products));
                     renderProducts();
                 };
-
                 li.appendChild(delBtn);
                 list.appendChild(li);
             });
         }
 
-        // Delete empty/null products
         function deleteEmptyProducts() {
             products = products.filter(p => p.name || p.price || p.wholesale);
             localStorage.setItem("products", JSON.stringify(products));
             renderProducts();
         }
 
-        // Start scanning barcode
-        document.getElementById("start-scan").addEventListener("click", () => {
+        function startQuagga() {
             Quagga.init({
                 inputStream: {
                     name: "Live",
@@ -87,13 +92,27 @@
             });
 
             Quagga.onDetected(function(result) {
-                currentBarcode = result.codeResult.code;
+                const code = result.codeResult.code;
                 Quagga.stop();
-                openPopup();
+                if(searchMode){
+                    searchBarcode(code);
+                } else {
+                    currentBarcode = code;
+                    openPopup();
+                }
             });
+        }
+
+        document.getElementById("start-scan").addEventListener("click", () => {
+            searchMode = false;
+            startQuagga();
         });
 
-        // Open popup form
+        document.getElementById("search-product").addEventListener("click", () => {
+            searchMode = true;
+            startQuagga();
+        });
+
         function openPopup() {
             document.getElementById("popup").style.display = "block";
             document.getElementById("prodName").value = "";
@@ -101,21 +120,36 @@
             document.getElementById("wholesale").value = "";
         }
 
-        // Close popup
         function closePopup() {
             document.getElementById("popup").style.display = "none";
         }
 
-        // Save product from popup
         function saveProduct() {
             const name = document.getElementById("prodName").value;
             const price = document.getElementById("price").value;
             const wholesale = document.getElementById("wholesale").value;
-
             products.push({ barcode: currentBarcode, name, price, wholesale });
             localStorage.setItem("products", JSON.stringify(products));
             renderProducts();
             closePopup();
+        }
+
+        // Search function
+        function searchBarcode(code){
+            const product = products.find(p => p.barcode === code);
+            if(product){
+                document.getElementById("sBarcode").textContent = product.barcode;
+                document.getElementById("sName").textContent = product.name;
+                document.getElementById("sPrice").textContent = product.price;
+                document.getElementById("sWholesale").textContent = product.wholesale;
+                document.getElementById("searchModal").style.display = "block";
+            } else {
+                alert("Product not found!");
+            }
+        }
+
+        function closeSearchModal() {
+            document.getElementById("searchModal").style.display = "none";
         }
 
         renderProducts();
