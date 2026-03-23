@@ -19,8 +19,10 @@
 <body>
 
 <h2>Barcode Scanner App</h2>
+
 <button id="start-scan">Add Product</button>
 <button id="search-product">Search Product</button>
+<button onclick="refreshPage()">Refresh</button>
 
 <div id="scanner"></div>
 
@@ -52,6 +54,11 @@ let products = JSON.parse(localStorage.getItem("products")) || [];
 let currentBarcode = "";
 let searchMode = false;
 let lastScan = 0;
+
+// 🔄 Refresh function
+function refreshPage() {
+    location.reload();
+}
 
 // Render list
 function renderProducts() {
