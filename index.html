@@ -2,230 +2,134 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App (Mobile-Friendly Fonts)</title>
-
-<script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barcode Scanner PWA</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4CAF50">
 <style>
-body { font-family:'Segoe UI', sans-serif; background:#f5f7fb; margin:0; padding:15px; }
-h2 { text-align:center; font-size:1.8rem; }
-
-/* Buttons */
-.top-buttons { display:flex; flex-wrap:wrap; gap:10px; margin:15px 0; }
-button { flex:1; padding:14px; border:none; border-radius:12px; font-weight:bold; font-size:1.1rem; background:#4CAF50; color:white; z-index:10000; position:relative; }
-
-/* Scanner */
-#scanner { width:100%; height:400px; border-radius:15px; overflow:hidden; background:black; position:relative; z-index:1; }
-#scanner video { pointer-events: none; } /* allow clicks to pass through video */
-
-/* Modals */
-.modal { display:none; position:fixed; bottom:0; width:100%; background:white; border-radius:20px 20px 0 0; padding:25px; box-shadow:0px -2px 15px rgba(0,0,0,0.3); z-index:9999; font-size:1.1rem; }
-
-/* Inputs */
-input { width:100%; padding:12px; margin-bottom:12px; border-radius:10px; border:1px solid #ccc; font-size:1rem; }
-
-/* List */
-#product-list li { background:white; margin-bottom:12px; padding:14px; border-radius:14px; list-style:none; font-size:1.05rem; line-height:1.4; }
-.small-btn { padding:8px 12px; font-size:1rem; margin-top:8px; background:#2196F3; border-radius:8px; }
-.delete-btn { background:#f44336; }
+  body { margin:0; font-family:Arial, sans-serif; background:#f5f7fb; }
+  #scanner { width:100%; height:60vh; background:#000; position:relative; }
+  button { font-size:1rem; margin:5px; padding:10px 15px; border:none; border-radius:5px; cursor:pointer; }
+  #manualAddBtn { position:absolute; bottom:15px; right:15px; z-index:1000; font-size:1.8rem; padding:12px; border-radius:50%; background:#4CAF50; color:#fff; box-shadow:0 4px 8px rgba(0,0,0,0.3); }
+  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
+  .modal-content { background:#fff; padding:20px; border-radius:10px; width:90%; max-width:400px; }
+  .modal-content input { width:100%; padding:8px; margin:5px 0; font-size:1rem; }
+  #productsListModal .modal-content { max-height:80vh; overflow-y:auto; }
+  .product-row { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ccc; padding:5px 0; font-size:1.1rem; }
+  .product-row button { font-size:0.9rem; padding:5px; margin-left:5px; }
 </style>
 </head>
 <body>
 
-<h2>📦 Barcode Scanner (Mobile-Friendly)</h2>
-
-<div class="top-buttons">
-  <button onclick="startScanner(false)">➕ Add</button>
-  <button onclick="startScanner(true)">🔍 Search</button>
-  <button onclick="openList()">📋 Products</button>
-  <button onclick="refreshPage()">🔄 Refresh</button>
-</div>
-
 <div id="scanner"></div>
+<button id="manualAddBtn">➕</button>
 
-<!-- Add Modal -->
-<div id="popup" class="modal">
-<h3 style="font-size:1.4rem;">Add Product</h3>
-<input id="manualBarcode" placeholder="Barcode">
-<input id="prodName" placeholder="Product Name">
-<input id="price" type="number" placeholder="Price">
-<input id="wholesale" type="number" placeholder="Wholesale Price">
-<button onclick="saveProduct()">Save</button>
-<button onclick="closePopup()">Cancel</button>
+<div style="padding:10px; display:flex; justify-content:center; flex-wrap:wrap;">
+  <button onclick="openProductsModal()">Products</button>
+  <button onclick="startScan()">Search</button>
+  <button onclick="refreshPage()">Refresh</button>
 </div>
 
-<!-- Edit Modal -->
-<div id="editModal" class="modal">
-<h3 style="font-size:1.4rem;">Edit Product</h3>
-<input id="editName">
-<input id="editPrice" type="number">
-<input id="editWholesale" type="number">
-<button onclick="updateProduct()">Update</button>
-<button onclick="closeEdit()">Cancel</button>
+<!-- Manual Add Modal -->
+<div id="manualAddModal" class="modal">
+  <div class="modal-content">
+    <h3>Add Product Manually</h3>
+    <input id="manualBarcodeInput" placeholder="Barcode (optional)">
+    <input id="manualNameInput" placeholder="Product Name">
+    <input id="manualPriceInput" type="number" placeholder="Price">
+    <input id="manualWholesaleInput" type="number" placeholder="Wholesale Price">
+    <button onclick="saveManualProduct()">Save</button>
+    <button onclick="closeManualModal()">Cancel</button>
+  </div>
 </div>
 
-<!-- Search Modal -->
-<div id="searchModal" class="modal">
-<h3 style="font-size:1.4rem;">Product Info</h3>
-<p><b>Barcode:</b> <span id="sBarcode"></span></p>
-<p><b>Name:</b> <span id="sName"></span></p>
-<p><b>Price:</b> <span id="sPrice"></span></p>
-<p><b>Wholesale:</b> <span id="sWholesale"></span></p>
-<button onclick="closeSearchModal()">Close</button>
+<!-- Products List Modal -->
+<div id="productsListModal" class="modal">
+  <div class="modal-content">
+    <h3>Saved Products</h3>
+    <div id="productsContainer"></div>
+    <button onclick="closeProductsModal()">Close</button>
+  </div>
 </div>
 
-<!-- List Modal -->
-<div id="listModal" class="modal">
-<h3 style="font-size:1.4rem;">Saved Products</h3>
-<ul id="product-list"></ul>
-<button onclick="closeList()">Close</button>
-</div>
+<!-- Audio for beep -->
+<audio id="beepAudio" src="beep.mp3" preload="auto"></audio>
 
+<script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-// --- LOCALSTORAGE DATABASE ---
 let products = JSON.parse(localStorage.getItem('products') || '[]');
-let currentBarcode = "";
-let searchMode = false;
-let html5QrCode = null;
-let editIndex = null;
 
-// --- WEB AUDIO BEEP ---
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playBeep(){
-    const oscillator = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    oscillator.type = 'square';
-    oscillator.frequency.value = 1000; // 1kHz beep
-    gainNode.gain.value = 0.1; // volume
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.15); // 150ms beep
-}
-
-// --- REFRESH ---
 function refreshPage(){ location.reload(); }
 
-// --- SAVE TO LOCALSTORAGE ---
-function saveToStorage(){ localStorage.setItem('products', JSON.stringify(products)); }
+// Manual Add
+const manualBtn = document.getElementById('manualAddBtn');
+manualBtn.addEventListener('click', ()=>{ document.getElementById('manualAddModal').style.display='flex'; });
+function closeManualModal(){ document.getElementById('manualAddModal').style.display='none'; }
+function saveManualProduct(){
+  const barcode = document.getElementById('manualBarcodeInput').value;
+  const name = document.getElementById('manualNameInput').value;
+  const price = document.getElementById('manualPriceInput').value;
+  const wholesale = document.getElementById('manualWholesaleInput').value;
+  if(!name){ alert("Product Name is required"); return; }
+  if(barcode && products.find(p=>p.barcode===barcode)){ alert("Product already exists"); return; }
+  products.push({barcode,name,price,wholesale});
+  localStorage.setItem('products', JSON.stringify(products));
+  document.getElementById('beepAudio').play();
+  closeManualModal(); alert("Product added!");
+}
 
-// --- FETCH PRODUCTS ---
-function fetchProducts(){ renderProducts(); }
-
-// --- LIST MODAL ---
-function openList(){ fetchProducts(); document.getElementById("listModal").style.display="block"; }
-function closeList(){ document.getElementById("listModal").style.display="none"; }
-
-// --- RENDER PRODUCTS ---
-function renderProducts(){
-  const list = document.getElementById("product-list");
-  list.innerHTML = "";
+// Products List Modal
+function openProductsModal(){
+  const container = document.getElementById('productsContainer');
+  container.innerHTML = '';
   products.forEach((p,i)=>{
-    let li = document.createElement("li");
-    li.innerHTML = `<b>${p.name}</b><br>${p.barcode}<br>₱${p.price} | ₱${p.wholesale}<br>
-      <button class="small-btn" onclick="openEdit(${i})">Edit</button>
-      <button class="small-btn delete-btn" onclick="deleteProduct(${i})">Delete</button>`;
-    list.appendChild(li);
+    const div = document.createElement('div');
+    div.className = 'product-row';
+    div.innerHTML = `<span>${p.barcode || '-'} | ${p.name} | ₱${p.price} | ₱${p.wholesale}</span>
+      <span>
+      <button onclick="editProduct(${i})">Edit</button>
+      <button onclick="deleteProduct(${i})">Delete</button>
+      </span>`;
+    container.appendChild(div);
   });
+  document.getElementById('productsListModal').style.display='flex';
+}
+function closeProductsModal(){ document.getElementById('productsListModal').style.display='none'; }
+function deleteProduct(i){ if(confirm("Delete this product?")){ products.splice(i,1); localStorage.setItem('products',JSON.stringify(products)); openProductsModal(); } }
+function editProduct(i){
+  const p = products[i];
+  document.getElementById('manualBarcodeInput').value = p.barcode || '';
+  document.getElementById('manualNameInput').value = p.name;
+  document.getElementById('manualPriceInput').value = p.price;
+  document.getElementById('manualWholesaleInput').value = p.wholesale;
+  document.getElementById('manualAddModal').style.display='flex';
+  closeProductsModal();
+  products.splice(i,1); // Remove old entry before saving
 }
 
-// --- DELETE PRODUCT ---
-function deleteProduct(index){
-  if(!confirm("Delete this product?")) return;
-  products.splice(index,1);
-  saveToStorage();
-  fetchProducts();
+// Barcode Scanner
+let html5QrcodeScanner;
+function startScan(){
+  const qrCodeRegionId = "scanner";
+  html5QrcodeScanner = new Html5Qrcode(qrCodeRegionId);
+  Html5Qrcode.getCameras().then(cameras=>{
+    if(cameras && cameras.length){ 
+      html5QrcodeScanner.start(
+        { facingMode: "environment" }, 
+        { fps: 10, qrbox: 250 },
+        qrCodeMessage => {
+          const existing = products.find(p=>p.barcode===qrCodeMessage);
+          if(existing){ alert(`Found: ${existing.name} ₱${existing.price}`); document.getElementById('beepAudio').play(); }
+          else{ alert(`Barcode: ${qrCodeMessage} not in list`); document.getElementById('beepAudio').play(); }
+        },
+        err => console.log(err)
+      );
+    }
+  }).catch(err=>alert("Camera error: "+err));
 }
 
-// --- SCANNER ---
-async function startScanner(mode){
-  searchMode = mode;
-  const scannerDiv = document.getElementById("scanner");
-  scannerDiv.innerHTML = "";
-
-  try {
-    if(html5QrCode){ try{ await html5QrCode.stop(); } catch{} html5QrCode=null; }
-    html5QrCode = new Html5Qrcode("scanner");
-
-    const devices = await Html5Qrcode.getCameras();
-    if(!devices.length){ alert("No camera found"); return; }
-
-    let backCamera = devices.find(d=>d.label.toLowerCase().includes("back")) || devices[0];
-
-    await html5QrCode.start(
-      backCamera.id,
-      { fps:10 },
-      decodedText=>{
-        html5QrCode.stop();
-        currentBarcode = decodedText;
-        document.getElementById("manualBarcode").value = decodedText;
-
-        // --- PLAY BEEP ---
-        playBeep();
-
-        if(searchMode) searchBarcode(decodedText);
-        else openPopup();
-      }
-    );
-
-  } catch(err){ console.error(err); alert("Camera error: "+err); }
-}
-
-// --- ADD PRODUCT ---
-function openPopup(){ document.getElementById("popup").style.display="block"; }
-function closePopup(){ document.getElementById("popup").style.display="none"; }
-
-function saveProduct(){
-  let barcode = currentBarcode || document.getElementById("manualBarcode").value;
-  let name = document.getElementById("prodName").value;
-  let price = document.getElementById("price").value;
-  let wholesale = document.getElementById("wholesale").value;
-
-  if(!barcode||!name){ alert("Missing data"); return; }
-  if(products.find(p=>p.barcode===barcode)){ alert("Product already exists"); return; }
-
-  products.push({ barcode,name,price,wholesale });
-  saveToStorage();
-  closePopup();
-  fetchProducts();
-}
-
-// --- EDIT PRODUCT ---
-function openEdit(i){
-  editIndex=i;
-  let p=products[i];
-  document.getElementById("editName").value=p.name;
-  document.getElementById("editPrice").value=p.price;
-  document.getElementById("editWholesale").value=p.wholesale;
-  closeList();
-  document.getElementById("editModal").style.display="block";
-}
-function closeEdit(){ document.getElementById("editModal").style.display="none"; }
-
-function updateProduct(){
-  products[editIndex].name = document.getElementById("editName").value;
-  products[editIndex].price = document.getElementById("editPrice").value;
-  products[editIndex].wholesale = document.getElementById("editWholesale").value;
-  saveToStorage();
-  closeEdit();
-  fetchProducts();
-  openList();
-}
-
-// --- SEARCH PRODUCT ---
-function searchBarcode(code){
-  let p = products.find(p=>p.barcode===code);
-  if(!p){ alert("Not found"); return; }
-  document.getElementById("sBarcode").textContent = p.barcode;
-  document.getElementById("sName").textContent = p.name;
-  document.getElementById("sPrice").textContent = p.price;
-  document.getElementById("sWholesale").textContent = p.wholesale;
-  document.getElementById("searchModal").style.display="block";
-}
-function closeSearchModal(){ document.getElementById("searchModal").style.display="none"; }
-
-// --- INIT ---
-fetchProducts();
+// PWA service worker
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js'); }
 </script>
 </body>
 </html>
