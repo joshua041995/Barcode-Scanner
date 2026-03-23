@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App (LocalStorage, Full-Screen)</title>
+<title>Barcode Scanner App (LocalStorage, Full-Width)</title>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
 
@@ -140,7 +140,7 @@ async function startScanner(mode){
 
     await html5QrCode.start(
       backCamera.id,
-      { fps:10, qrbox: function(w,h){ return Math.min(w,h)*0.8; } }, // almost full screen
+      { fps:10 },  // FULL preview, no qrbox
       decodedText=>{
         html5QrCode.stop();
         currentBarcode = decodedText;
