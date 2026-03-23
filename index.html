@@ -2,13 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Barcode Scanner App</title>
+<title>Barcode Scanner App (LocalStorage)</title>
 
-<!-- HTML5 QR Code Scanner -->
 <script src="https://unpkg.com/html5-qrcode@2.3.7/html5-qrcode.min.js"></script>
-
-<!-- Supabase JS -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 
 <style>
 body { font-family:'Segoe UI', sans-serif; background:#f5f7fb; margin:0; padding:15px; }
@@ -35,7 +31,7 @@ input { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:
 </head>
 <body>
 
-<h2>📦 Barcode Scanner</h2>
+<h2>📦 Barcode Scanner (LocalStorage)</h2>
 
 <div class="top-buttons">
   <button onclick="startScanner(false)">➕ Add</button>
@@ -85,13 +81,8 @@ input { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:
 </div>
 
 <script>
-// --- SUPABASE CLIENT ---
-const supabase = supabase.createClient(
-  "https://sdmhthsjkivujmdlaepv.supabase.co",
-  "sb_publishable_KDqLJlPRj0A6MIj1c-XMiw_agu52AzC" // YOUR ANON KEY
-);
-
-let products = [];
+// --- LOCALSTORAGE DATABASE ---
+let products = JSON.parse(localStorage.getItem('products') || '[]');
 let currentBarcode = "";
 let searchMode = false;
 let html5QrCode = null;
@@ -100,15 +91,13 @@ let editIndex = null;
 // --- REFRESH ---
 function refreshPage(){ location.reload(); }
 
-// --- FETCH PRODUCTS ---
-async function fetchProducts(){
-  try {
-    const { data, error } = await supabase.from('products').select('*');
-    if(error){ console.error(error); return; }
-    products = data || [];
-    renderProducts();
-  } catch(e){ console.error("Fetch error:", e); }
+// --- SAVE TO LOCALSTORAGE ---
+function saveToStorage(){
+  localStorage.setItem('products', JSON.stringify(products));
 }
+
+// --- FETCH PRODUCTS ---
+function fetchProducts(){ renderProducts(); }
 
 // --- LIST MODAL ---
 function openList(){ fetchProducts(); document.getElementById("listModal").style.display="block"; }
@@ -122,18 +111,17 @@ function renderProducts(){
     let li = document.createElement("li");
     li.innerHTML = `<b>${p.name}</b><br>${p.barcode}<br>₱${p.price} | ₱${p.wholesale}<br>
       <button class="small-btn" onclick="openEdit(${i})">Edit</button>
-      <button class="small-btn delete-btn" onclick="deleteProduct('${p.barcode}')">Delete</button>`;
+      <button class="small-btn delete-btn" onclick="deleteProduct(${i})">Delete</button>`;
     list.appendChild(li);
   });
 }
 
 // --- DELETE PRODUCT ---
-async function deleteProduct(barcode){
-  try{
-    const { error } = await supabase.from('products').delete().eq('barcode', barcode);
-    if(error){ console.error(error); return; }
-    fetchProducts();
-  }catch(e){ console.error(e); }
+function deleteProduct(index){
+  if(!confirm("Delete this product?")) return;
+  products.splice(index,1);
+  saveToStorage();
+  fetchProducts();
 }
 
 // --- SCANNER ---
@@ -167,7 +155,7 @@ async function startScanner(mode){
 function openPopup(){ document.getElementById("popup").style.display="block"; }
 function closePopup(){ document.getElementById("popup").style.display="none"; }
 
-async function saveProduct(){
+function saveProduct(){
   let barcode = currentBarcode || document.getElementById("manualBarcode").value;
   let name = document.getElementById("prodName").value;
   let price = document.getElementById("price").value;
@@ -175,17 +163,12 @@ async function saveProduct(){
 
   if(!barcode||!name){ alert("Missing data"); return; }
 
-  try{
-    const { data: exist, error: e1 } = await supabase.from('products').select('*').eq('barcode', barcode).single();
-    if(e1){ console.error(e1); return; }
-    if(exist){ alert("Product already exists"); return; }
+  if(products.find(p=>p.barcode===barcode)){ alert("Product already exists"); return; }
 
-    const { error } = await supabase.from('products').insert([{ barcode, name, price, wholesale }]);
-    if(error){ console.error(error); return; }
-
-    closePopup();
-    fetchProducts();
-  } catch(e){ console.error(e); }
+  products.push({ barcode,name,price,wholesale });
+  saveToStorage();
+  closePopup();
+  fetchProducts();
 }
 
 // --- EDIT PRODUCT ---
@@ -200,39 +183,30 @@ function openEdit(i){
 }
 function closeEdit(){ document.getElementById("editModal").style.display="none"; }
 
-async function updateProduct(){
-  try{
-    const { error } = await supabase.from('products').update({
-      name: document.getElementById("editName").value,
-      price: document.getElementById("editPrice").value,
-      wholesale: document.getElementById("editWholesale").value
-    }).eq('barcode', products[editIndex].barcode);
-
-    if(error){ console.error(error); return; }
-
-    closeEdit(); fetchProducts(); openList();
-  }catch(e){ console.error(e); }
+function updateProduct(){
+  products[editIndex].name = document.getElementById("editName").value;
+  products[editIndex].price = document.getElementById("editPrice").value;
+  products[editIndex].wholesale = document.getElementById("editWholesale").value;
+  saveToStorage();
+  closeEdit();
+  fetchProducts();
+  openList();
 }
 
 // --- SEARCH PRODUCT ---
-async function searchBarcode(code){
-  try{
-    const { data, error } = await supabase.from('products').select('*').eq('barcode', code).single();
-    if(error){ alert("Not found"); return; }
-
-    document.getElementById("sBarcode").textContent = data.barcode;
-    document.getElementById("sName").textContent = data.name;
-    document.getElementById("sPrice").textContent = data.price;
-    document.getElementById("sWholesale").textContent = data.wholesale;
-
-    document.getElementById("searchModal").style.display="block";
-  }catch(e){ console.error(e); }
+function searchBarcode(code){
+  let p = products.find(p=>p.barcode===code);
+  if(!p){ alert("Not found"); return; }
+  document.getElementById("sBarcode").textContent = p.barcode;
+  document.getElementById("sName").textContent = p.name;
+  document.getElementById("sPrice").textContent = p.price;
+  document.getElementById("sWholesale").textContent = p.wholesale;
+  document.getElementById("searchModal").style.display="block";
 }
 function closeSearchModal(){ document.getElementById("searchModal").style.display="none"; }
 
 // --- INIT ---
 fetchProducts();
 </script>
-
 </body>
 </html>
