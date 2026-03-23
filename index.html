@@ -7,7 +7,10 @@
     <style>
         body { font-family: Arial; padding: 20px; }
         #scanner { width: 100%; height: 250px; border: 1px solid #ccc; margin-bottom: 20px; }
-        button { padding: 10px 20px; font-size: 16px; }
+        button { padding: 8px 16px; font-size: 14px; margin: 2px; }
+        #popup { display:none; position:fixed; top:20%; left:10%; background:white; 
+                 padding:20px; border:1px solid black; z-index:1000; }
+        #popup input { width: 100%; margin-bottom: 8px; padding: 6px; }
     </style>
 </head>
 <body>
@@ -16,33 +19,67 @@
     <div id="scanner"></div>
 
     <h3>Saved Products</h3>
+    <button onclick="deleteEmptyProducts()">Delete Empty Products</button>
     <ul id="product-list"></ul>
+
+    <!-- Popup Form -->
+    <div id="popup">
+        <label>ProdName: <input type="text" id="prodName"/></label><br/>
+        <label>Price: <input type="number" id="price"/></label><br/>
+        <label>WholesalePrice: <input type="number" id="wholesale"/></label><br/>
+        <button onclick="saveProduct()">Save</button>
+        <button onclick="closePopup()">Cancel</button>
+    </div>
 
     <script>
         let products = JSON.parse(localStorage.getItem("products")) || [];
+        let currentBarcode = "";
 
+        // Render products list
         function renderProducts() {
             const list = document.getElementById("product-list");
             list.innerHTML = "";
-            products.forEach(p => {
+
+            products.forEach((p, index) => {
                 const li = document.createElement("li");
-                li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale}`;
+                li.textContent = `${p.barcode} | ${p.name} | ${p.price} | ${p.wholesale} `;
+
+                // Delete button for each product
+                const delBtn = document.createElement("button");
+                delBtn.textContent = "Delete";
+                delBtn.onclick = () => {
+                    products.splice(index, 1);
+                    localStorage.setItem("products", JSON.stringify(products));
+                    renderProducts();
+                };
+
+                li.appendChild(delBtn);
                 list.appendChild(li);
             });
         }
 
+        // Delete empty/null products
+        function deleteEmptyProducts() {
+            products = products.filter(p => p.name || p.price || p.wholesale);
+            localStorage.setItem("products", JSON.stringify(products));
+            renderProducts();
+        }
+
+        // Start scanning barcode
         document.getElementById("start-scan").addEventListener("click", () => {
             Quagga.init({
-                inputStream : {
-                    name : "Live",
-                    type : "LiveStream",
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
                     target: document.querySelector('#scanner'),
                     constraints: {
-                        facingMode: "environment"
+                        facingMode: { exact: "environment" },
+                        width: 400,
+                        height: 300
                     }
                 },
-                decoder : {
-                    readers : ["code_128_reader","ean_reader","ean_8_reader","upc_reader"]
+                decoder: {
+                    readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader"]
                 }
             }, function(err) {
                 if (err) { console.error(err); return; }
@@ -50,18 +87,36 @@
             });
 
             Quagga.onDetected(function(result) {
-                const code = result.codeResult.code;
+                currentBarcode = result.codeResult.code;
                 Quagga.stop();
-
-                const name = prompt("ProdName:");
-                const price = prompt("Price:");
-                const wholesale = prompt("WholeSalePrice:");
-
-                products.push({ barcode: code, name, price, wholesale });
-                localStorage.setItem("products", JSON.stringify(products));
-                renderProducts();
+                openPopup();
             });
         });
+
+        // Open popup form
+        function openPopup() {
+            document.getElementById("popup").style.display = "block";
+            document.getElementById("prodName").value = "";
+            document.getElementById("price").value = "";
+            document.getElementById("wholesale").value = "";
+        }
+
+        // Close popup
+        function closePopup() {
+            document.getElementById("popup").style.display = "none";
+        }
+
+        // Save product from popup
+        function saveProduct() {
+            const name = document.getElementById("prodName").value;
+            const price = document.getElementById("price").value;
+            const wholesale = document.getElementById("wholesale").value;
+
+            products.push({ barcode: currentBarcode, name, price, wholesale });
+            localStorage.setItem("products", JSON.stringify(products));
+            renderProducts();
+            closePopup();
+        }
 
         renderProducts();
     </script>
