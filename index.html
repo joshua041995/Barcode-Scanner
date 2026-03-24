@@ -224,42 +224,15 @@ function editProduct(barcode){
 /* ADD PRODUCT */
 function openAddModal(){ document.getElementById("manualAddModal").style.display="flex"; }
 function closeAdd(){ document.getElementById("manualAddModal").style.display="none"; }
-function clearFields(){ barcode.value=""; name.value=""; price.value=""; stock.value=""; editingIndex=null; }
+function clearFields(){ 
+  document.getElementById("barcode").value=""; 
+  document.getElementById("name").value=""; 
+  document.getElementById("price").value=""; 
+  document.getElementById("stock").value=""; 
+  editingIndex=null; 
+}
 function saveProduct(){ 
-  const b = barcode.value.trim();
-  const n = name.value.trim();
-  const pVal = parseFloat(price.value)||0;
-  const sVal = parseInt(stock.value)||0;
-  if(!b || !n){ alert("Fill barcode and name"); return; }
-
-  if(editingIndex===null){ // new product
-    if(products.find(p=>p.barcode===b)){ alert("Product already exists"); return; }
-    products.push({barcode:b,name:n,price:pVal,stock:sVal});
-  } else { // editing
-    products[editingIndex]={barcode:b,name:n,price:pVal,stock:sVal};
-    editingIndex=null;
-  }
-  saveProducts();
-  clearFields();
-  closeAdd();
-  openProducts();
-}
-function saveProducts(){ localStorage.setItem("products",JSON.stringify(products)); }
-
-/* CART MODAL */
-function openCart(){ document.getElementById("posCartModal").style.display="flex"; updateCartUI(); }
-function closeCart(){ document.getElementById("posCartModal").style.display="none"; }
-
-/* PRINT */
-function printReceipt(){ 
-  if(cart.length===0){ alert("Empty"); return; } 
-  let body=document.getElementById("receiptBody"); body.innerHTML=""; 
-  let total=0;
-  cart.forEach(item=>{ total+=item.total; let tr=document.createElement("tr"); tr.innerHTML=`<td>${item.name}</td><td>${item.qty}</td><td>₱${item.total.toFixed(2)}</td>`; body.appendChild(tr); });
-  document.getElementById("receiptTotal").innerText=total.toFixed(2);
-  document.getElementById("receiptDate").innerText=new Date().toLocaleString();
-  window.print();
-}
-</script>
-</body>
-</html>
+  const b = document.getElementById("barcode").value.trim();
+  const n = document.getElementById("name").value.trim();
+  const pVal = parseFloat(document.getElementById("price").value)||0;
+  const sVal = parseInt(document.getElementById("stock").value
