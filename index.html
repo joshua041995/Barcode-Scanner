@@ -24,6 +24,7 @@ button { padding:8px; margin:3px; border:none; border-radius:6px; font-size:0.85
 .delete-btn { background:red; }
 .edit-btn { background:blue; }
 .qty-btn { padding:3px 6px; font-size:0.8rem;}
+#cartSearchResults { max-height:100px; overflow-y:auto; margin-bottom:5px; }
 #printReceiptDiv { position:absolute; left:-9999px;}
 @media print {
   body * { visibility:hidden; }
@@ -79,6 +80,8 @@ button { padding:8px; margin:3px; border:none; border-radius:6px; font-size:0.85
 <div id="posCartModal" class="modal">
 <div class="modal-content">
 <h3>Cart</h3>
+<input id="cartSearchInput" placeholder="Search product..." oninput="filterCartSearch()">
+<div id="cartSearchResults"></div>
 <div id="cartItems"></div>
 <h3>Total: ₱<span id="cartTotal">0</span></h3>
 <button onclick="clearCart()">Clear</button>
@@ -216,6 +219,40 @@ function clearCart(){
   updateCartUI();
 }
 
+/* CART SEARCH */
+function filterCartSearch(){
+  let input = document.getElementById("cartSearchInput").value.toLowerCase();
+  let resultsDiv = document.getElementById("cartSearchResults");
+  resultsDiv.innerHTML = "";
+  if(input === "") return;
+  let matches = products.filter(p => p.name.toLowerCase().includes(input));
+  matches.forEach(p=>{
+    let div = document.createElement("div");
+    div.style.padding="3px"; div.style.borderBottom="1px solid #ccc"; div.style.cursor="pointer";
+    div.textContent = `${p.name} ₱${p.price} [${p.stock}]`;
+    div.onclick = function(){
+      addToCartFromSearch(p.barcode);
+      document.getElementById("cartSearchInput").value = "";
+      resultsDiv.innerHTML = "";
+    };
+    resultsDiv.appendChild(div);
+  });
+}
+
+function addToCartFromSearch(barcode){
+  let p = products.find(x=>x.barcode===barcode);
+  if(!p){ alert("Product not found"); return; }
+  if(p.stock <=0){ alert("Out of stock"); return; }
+
+  let item = cart.find(i=>i.barcode===barcode);
+  if(item){ item.qty++; item.total=item.qty*item.price; }
+  else cart.push({barcode:p.barcode, name:p.name, price:p.price, qty:1, total:p.price});
+
+  p.stock--;
+  saveProducts();
+  updateCartUI();
+}
+
 /* PRODUCTS */
 function openProducts(){
   let list = document.getElementById("productList");
@@ -228,7 +265,6 @@ function openProducts(){
     let div = document.createElement("div");
     div.className = "product-row";
     div.style.color = (p.stock <= 0) ? "red" : "black";
-
     div.innerHTML = `
       <span>${p.name} ₱${p.price} [${p.stock}]</span>
       <div>
