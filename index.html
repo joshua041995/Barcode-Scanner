@@ -84,6 +84,7 @@ let products = JSON.parse(localStorage.getItem('products')||'[]');
 let cart = [];
 let scanner;
 let mode="";
+let lastScanTime = 0; // For 2-second interval
 
 // Initialize scanner
 function initScanner(){
@@ -95,10 +96,7 @@ function initScanner(){
 // Start scanner
 function startScan(m){
   mode = m;
-
-  // Show cart button only in POS mode
   document.getElementById("posControls").style.display = (mode === "pos") ? "block" : "none";
-
   initScanner();
 
   Html5Qrcode.getCameras().then(()=>{
@@ -186,13 +184,23 @@ function editProduct(code){
   }
 }
 
-// POS Bulk Scan
+// POS Bulk Scan with 2-second interval
 function handlePOSScan(code){
+  let now = Date.now();
+  if(now - lastScanTime < 2000) return; // ignore if less than 2 seconds
+  lastScanTime = now;
+
   let product = products.find(p=>p.barcode===code);
   if(!product){ alert("Product not found"); return; }
+
   let existing = cart.find(i=>i.barcode===code);
-  if(existing){ existing.qty +=1; existing.total = existing.qty * existing.price; }
-  else { cart.push({barcode:product.barcode,name:product.name,price:product.price,qty:1,total:product.price}); }
+  if(existing){ 
+    existing.qty += 1; 
+    existing.total = existing.qty * existing.price; 
+  } else { 
+    cart.push({barcode:product.barcode,name:product.name,price:product.price,qty:1,total:product.price}); 
+  }
+
   beep();
   updateCartUI();
 }
