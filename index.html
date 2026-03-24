@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>POS Scanner with Inventory</title>
+<title>POS Scanner with Inventory & Fast Print</title>
 <style>
 body { margin:0; font-family:Arial; background:#f5f7fb; }
 #scanner { width:100%; height:45vh; background:#000; position:relative; }
@@ -17,6 +17,7 @@ input { width:100%; padding:8px; margin:5px 0; }
 #scanBarcodeBtn { position:absolute; right:5px; top:5px; }
 .close-btn { position:absolute; top:10px; right:10px; background:#ccc; border-radius:50%; width:25px; height:25px; font-weight:bold; line-height:25px; text-align:center; cursor:pointer; }
 #posControls button { font-size:1rem; padding:12px 20px; border-radius:8px; }
+#printReceiptDiv { position:absolute; left:-9999px; }
 </style>
 </head>
 <body>
@@ -56,7 +57,7 @@ input { width:100%; padding:8px; margin:5px 0; }
 </div>
 </div>
 
-<!-- Products List Modal (Clean with red highlight if out-of-stock) -->
+<!-- Products List Modal (Clean + red out-of-stock) -->
 <div id="productsModal" class="modal">
 <div class="modal-content">
 <span class="close-btn" onclick="closeProducts()">×</span>
@@ -65,7 +66,7 @@ input { width:100%; padding:8px; margin:5px 0; }
 </div>
 </div>
 
-<!-- Search Result Modal (with Edit/Delete and red stock highlight) -->
+<!-- Search Result Modal -->
 <div id="searchResultModal" class="modal">
   <div class="modal-content">
     <span class="close-btn" onclick="closeSearchResult()">×</span>
@@ -87,8 +88,29 @@ input { width:100%; padding:8px; margin:5px 0; }
 </div>
 </div>
 
-<audio id="beepAudio" src="beep.mp3.wav"></audio>
+<!-- Hidden receipt div for fast print -->
+<div id="printReceiptDiv">
+  <h2 style="text-align:center;">STORE RECEIPT</h2>
+  <p id="receiptDate"></p>
+  <table style="width:100%; border-collapse:collapse;">
+    <thead>
+      <tr>
+        <td><b>Item</b></td>
+        <td><b>Qty</b></td>
+        <td><b>Total</b></td>
+      </tr>
+    </thead>
+    <tbody id="receiptBody"></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2" class="total"><b>TOTAL</b></td>
+        <td id="receiptTotal"><b>0</b></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
 
+<audio id="beepAudio" src="beep.mp3.wav"></audio>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
 let products = JSON.parse(localStorage.getItem('products')||'[]');
@@ -118,11 +140,7 @@ function startScan(m){
         beep();
         if(mode==="search"){
           let p = products.find(x=>x.barcode===code);
-          if(p){
-            showSearchResult(p);
-          } else {
-            alert("Product not found");
-          }
+          if(p){ showSearchResult(p); } else { alert("Product not found"); }
           scanner.stop();
         }
         if(mode==="manual"){
@@ -130,9 +148,7 @@ function startScan(m){
           document.getElementById("manualAddModal").style.display="flex";
           scanner.stop();
         }
-        if(mode==="pos"){
-          handlePOSScan(code);
-        }
+        if(mode==="pos"){ handlePOSScan(code); }
       }
     );
   }).catch(err=>{
@@ -151,16 +167,12 @@ document.getElementById("manualAddBtn").onclick=()=>{
 }
 function closeModal(){ document.getElementById("manualAddModal").style.display="none"; }
 function clearFields(){ 
-  manualBarcodeInput.value=""; 
-  manualNameInput.value=""; 
-  manualPriceInput.value=""; 
-  manualStockInput.value="";
+  manualBarcodeInput.value=""; manualNameInput.value=""; manualPriceInput.value=""; manualStockInput.value="";
   editingBarcode = null;
 }
 function saveProduct(){
   if(!manualNameInput.value){ alert("Name required"); return; }
   let stockValue = parseInt(manualStockInput.value) || 0;
-
   if(editingBarcode){
     let index = products.findIndex(p=>p.barcode===editingBarcode);
     products[index] = {
@@ -172,8 +184,7 @@ function saveProduct(){
     editingBarcode = null;
   } else {
     if(manualBarcodeInput.value && products.find(p=>p.barcode===manualBarcodeInput.value)){
-      alert("Product exists"); 
-      return; 
+      alert("Product exists"); return; 
     }
     products.push({
       barcode: manualBarcodeInput.value,
@@ -182,7 +193,6 @@ function saveProduct(){
       stock: stockValue
     });
   }
-
   localStorage.setItem("products",JSON.stringify(products));
   beep();
   closeModal();
@@ -194,7 +204,7 @@ scanBarcodeBtn.onclick=()=>{
   startScan("manual");
 };
 
-// Products List (Clean + red for out-of-stock)
+// Products List
 function openProducts(){
   let list = document.getElementById("productList");
   list.innerHTML = "";
@@ -209,7 +219,7 @@ function openProducts(){
 }
 function closeProducts(){ document.getElementById("productsModal").style.display = "none"; }
 
-// Search Modal functions
+// Search Modal
 function showSearchResult(product){
   let content = document.getElementById("searchResultContent");
   content.innerHTML = `
@@ -231,7 +241,7 @@ function deleteProductFromSearch(barcode){
   }
 }
 
-// Edit product (Add Product modal)
+// Edit product
 function editProduct(code){
   let p = products.find(p=>p.barcode===code);
   if(p){
@@ -250,27 +260,19 @@ function handlePOSScan(code){
   let now = Date.now();
   if(now - lastScanTime < 2000) return;
   lastScanTime = now;
-
   let product = products.find(p=>p.barcode===code);
   if(!product){ alert("Product not found"); return; }
-
   if(product.stock <= 0){ alert("Out of stock!"); return; }
-
   let existing = cart.find(i=>i.barcode===code);
   if(existing){
-    if(existing.qty + 1 > product.stock){
-      alert("Cannot add more than stock!");
-      return;
-    }
+    if(existing.qty + 1 > product.stock){ alert("Cannot add more than stock!"); return; }
     existing.qty += 1;
     existing.total = existing.qty * existing.price;
   } else {
     cart.push({barcode:product.barcode,name:product.name,price:product.price,qty:1,total:product.price});
   }
-
   product.stock -= 1;
   localStorage.setItem("products",JSON.stringify(products));
-
   beep();
   updateCartUI();
 }
@@ -323,41 +325,24 @@ function clearCart(){
   updateCartUI(); 
 }
 
-// Print receipt
+// Fast Print using hidden div
 function printReceipt(){
   if(cart.length===0){ alert("Cart is empty"); return; }
+
+  const receiptBody = document.getElementById("receiptBody");
+  receiptBody.innerHTML = "";
   let total = 0;
-  let itemsHTML = "";
   cart.forEach(item=>{
     total += item.total;
-    itemsHTML += `<tr><td>${item.name}</td><td>${item.qty}</td><td>₱${item.total.toFixed(2)}</td></tr>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${item.name}</td><td>${item.qty}</td><td>₱${item.total.toFixed(2)}</td>`;
+    receiptBody.appendChild(tr);
   });
-  let receiptWindow = window.open('', '', 'width=400,height=600');
-  receiptWindow.document.write(`
-    <html>
-    <head>
-      <title>Receipt</title>
-      <style>
-        body { font-family: monospace; padding:10px; }
-        h2 { text-align:center; }
-        table { width:100%; border-collapse:collapse; }
-        td { padding:5px; border-bottom:1px dashed #000; }
-        .total { font-weight:bold; }
-      </style>
-    </head>
-    <body>
-      <h2>STORE RECEIPT</h2>
-      <p>${new Date().toLocaleString()}</p>
-      <table>
-        <tr><td><b>Item</b></td><td><b>Qty</b></td><td><b>Total</b></td></tr>
-        ${itemsHTML}
-        <tr class="total"><td colspan="2">TOTAL</td><td>₱${total.toFixed(2)}</td></tr>
-      </table>
-    </body>
-    </html>
-  `);
-  receiptWindow.document.close();
-  setTimeout(()=>{ receiptWindow.print(); }, 300);
+
+  document.getElementById("receiptTotal").innerText = `₱${total.toFixed(2)}`;
+  document.getElementById("receiptDate").innerText = new Date().toLocaleString();
+
+  window.print(); // print only the hidden div
 }
 </script>
 
