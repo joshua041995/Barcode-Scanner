@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POS Scanner</title>
-
 <style>
 body { margin:0; font-family:Arial; background:#f5f7fb; }
 .topbar { position:sticky; top:0; background:#fff; z-index:1000; padding:5px; text-align:center; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
@@ -121,41 +120,32 @@ let lastScanTime=0;
 
 function beep(){ document.getElementById("beepAudio").play(); }
 
-/* SCANNER FIXED */
+/* SCANNER WITH HTTPS & BACK CAMERA */
 function startScan(m){
   mode = m;
   document.getElementById("posControls").style.display = (m === "pos") ? "block" : "none";
 
-  if(!scanner){
-    scanner = new Html5Qrcode("scanner");
-  } else {
-    scanner.stop().catch(()=>{});
-  }
+  if(!scanner) scanner = new Html5Qrcode("scanner");
+  else scanner.stop().catch(()=>{});
 
-  Html5Qrcode.getCameras().then(cameras => {
-    if(cameras && cameras.length){
-      let cameraId = cameras[0].id;
-      scanner.start(
-        cameraId,
-        { fps: 10, qrbox: 250 },
-        code => {
-          beep();
-          if(mode==="add"){
-            document.getElementById("barcode").value = code; 
-            document.getElementById("manualAddModal").style.display="flex"; 
-            scanner.stop();
-          }
-          if(mode==="pos") handlePOSScan(code);
-          if(mode==="search"){
-            let p=products.find(x=>x.barcode===code); 
-            alert(p ? `${p.name} ₱${p.price} Stock:${p.stock}` : "Not found"); 
-            scanner.stop();
-          }
-        },
-        errorMessage => {}
-      ).catch(err => console.error(err));
-    } else { alert("No camera found"); }
-  }).catch(err => alert("Camera access error: "+err));
+  // Start scanner with back camera
+  scanner.start(
+    { facingMode: { exact: "environment" } }, 
+    { fps: 10, qrbox: 250 },
+    code => {
+      beep();
+      if(mode==="add"){ document.getElementById("barcode").value = code; document.getElementById("manualAddModal").style.display="flex"; scanner.stop(); }
+      if(mode==="pos") handlePOSScan(code);
+      if(mode==="search"){ 
+        let p=products.find(x=>x.barcode===code); 
+        alert(p ? `${p.name} ₱${p.price} Stock:${p.stock}` : "Not found"); 
+        scanner.stop();
+      }
+    },
+    err => {}
+  ).catch(err => {
+    alert("Camera failed. Use manual barcode input. "+err);
+  });
 }
 
 /* CAMERA BUTTON */
