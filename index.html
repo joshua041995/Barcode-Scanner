@@ -13,6 +13,7 @@ button { padding:10px; margin:5px; border:none; border-radius:6px; font-size:1re
 .modal-content { background:#fff; padding:20px; border-radius:10px; width:90%; max-width:400px; position:relative; }
 input { width:100%; padding:8px; margin:5px 0; }
 .product-row { border-bottom:1px solid #ccc; padding:5px; font-size:1rem; display:flex; justify-content:space-between; align-items:center; }
+.product-row div button { margin:0 2px; }
 #scanBarcodeBtn { position:absolute; right:5px; top:5px; }
 .close-btn { position:absolute; top:10px; right:10px; background:#ccc; border-radius:50%; width:25px; height:25px; font-weight:bold; line-height:25px; text-align:center; cursor:pointer; }
 #posControls button { font-size:1rem; padding:12px 20px; border-radius:8px; }
@@ -84,7 +85,7 @@ let products = JSON.parse(localStorage.getItem('products')||'[]');
 let cart = [];
 let scanner;
 let mode="";
-let lastScanTime = 0; // For 2-second interval
+let lastScanTime = 0; // 2-second interval for POS
 
 // Initialize scanner
 function initScanner(){
@@ -187,7 +188,7 @@ function editProduct(code){
 // POS Bulk Scan with 2-second interval
 function handlePOSScan(code){
   let now = Date.now();
-  if(now - lastScanTime < 2000) return; // ignore if less than 2 seconds
+  if(now - lastScanTime < 2000) return; // ignore if <2 sec
   lastScanTime = now;
 
   let product = products.find(p=>p.barcode===code);
@@ -205,20 +206,36 @@ function handlePOSScan(code){
   updateCartUI();
 }
 
-// Cart UI
+// Cart UI with +/- buttons
 function updateCartUI(){
   let container = document.getElementById("cartItems");
   container.innerHTML="";
   let total = 0;
-  cart.forEach(item=>{
+  cart.forEach((item,index)=>{
     total += item.total;
     let div = document.createElement("div");
     div.className = "product-row";
-    div.innerText = `${item.name} x${item.qty} ₱${item.total.toFixed(2)}`;
+    div.innerHTML = `
+      <span>${item.name}</span>
+      <div>
+        <button onclick="changeQty(${index}, -1)">−</button>
+        <span>${item.qty}</span>
+        <button onclick="changeQty(${index}, 1)">+</button>
+        ₱${item.total.toFixed(2)}
+      </div>
+    `;
     container.appendChild(div);
   });
   document.getElementById("cartTotal").innerText = total.toFixed(2);
 }
+
+function changeQty(index, delta){
+  cart[index].qty += delta;
+  if(cart[index].qty < 0) cart[index].qty = 0;
+  cart[index].total = cart[index].qty * cart[index].price;
+  updateCartUI();
+}
+
 function openCart(){ document.getElementById("posCartModal").style.display="flex"; }
 function closeCart(){ document.getElementById("posCartModal").style.display="none"; }
 function clearCart(){ cart=[]; updateCartUI(); }
