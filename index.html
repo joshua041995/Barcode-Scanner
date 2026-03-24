@@ -86,6 +86,7 @@ let cart = [];
 let scanner;
 let mode="";
 let lastScanTime = 0; // 2-second interval for POS
+let editingBarcode = null; // null if adding new, or contains barcode being edited
 
 // Initialize scanner
 function initScanner(){
@@ -131,13 +132,42 @@ function startScan(m){
 function beep(){ document.getElementById("beepAudio").play(); }
 
 // Manual Add
-document.getElementById("manualAddBtn").onclick=()=>{ document.getElementById("manualAddModal").style.display="flex"; }
+document.getElementById("manualAddBtn").onclick=()=>{ 
+  editingBarcode = null; // reset when opening manually
+  document.getElementById("manualAddModal").style.display="flex"; 
+}
 function closeModal(){ document.getElementById("manualAddModal").style.display="none"; }
-function clearFields(){ manualBarcodeInput.value=""; manualNameInput.value=""; manualPriceInput.value=""; }
+function clearFields(){ 
+  manualBarcodeInput.value=""; 
+  manualNameInput.value=""; 
+  manualPriceInput.value=""; 
+  editingBarcode = null;
+}
 function saveProduct(){
   if(!manualNameInput.value){ alert("Name required"); return; }
-  if(manualBarcodeInput.value && products.find(p=>p.barcode===manualBarcodeInput.value)){ alert("Product exists"); return; }
-  products.push({barcode:manualBarcodeInput.value,name:manualNameInput.value,price:parseFloat(manualPriceInput.value)||0});
+
+  if(editingBarcode){
+    // Editing existing product
+    let index = products.findIndex(p=>p.barcode===editingBarcode);
+    products[index] = {
+      barcode: manualBarcodeInput.value,
+      name: manualNameInput.value,
+      price: parseFloat(manualPriceInput.value)||0
+    };
+    editingBarcode = null; // reset
+  } else {
+    // Adding new product
+    if(manualBarcodeInput.value && products.find(p=>p.barcode===manualBarcodeInput.value)){
+      alert("Product exists"); 
+      return; 
+    }
+    products.push({
+      barcode: manualBarcodeInput.value,
+      name: manualNameInput.value,
+      price: parseFloat(manualPriceInput.value)||0
+    });
+  }
+
   localStorage.setItem("products",JSON.stringify(products));
   beep();
   closeModal();
@@ -181,6 +211,7 @@ function editProduct(code){
     manualBarcodeInput.value = p.barcode;
     manualNameInput.value = p.name;
     manualPriceInput.value = p.price;
+    editingBarcode = code; // mark as editing
     document.getElementById("manualAddModal").style.display="flex";
   }
 }
