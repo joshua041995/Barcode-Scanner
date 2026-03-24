@@ -3,173 +3,271 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Barcode Scanner PWA</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#4CAF50">
+<title>POS Scanner</title>
+
 <style>
-  body { margin:0; font-family:Arial, sans-serif; background:#f5f7fb; }
-  #scanner { width:100%; height:60vh; background:#000; position:relative; }
-  button { font-size:1rem; margin:5px; padding:10px 15px; border:none; border-radius:5px; cursor:pointer; }
-  #manualAddBtn { position:absolute; bottom:15px; right:15px; z-index:1000; font-size:1.8rem; padding:12px; border-radius:50%; background:#4CAF50; color:#fff; box-shadow:0 4px 8px rgba(0,0,0,0.3); }
-  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-  .modal-content { background:#fff; padding:20px; border-radius:10px; width:90%; max-width:400px; }
-  .modal-content input { width:100%; padding:8px; margin:5px 0; font-size:1rem; }
-  #productsListModal .modal-content { max-height:80vh; overflow-y:auto; }
-  .product-row { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ccc; padding:5px 0; font-size:1.1rem; }
-  .product-row button { font-size:0.9rem; padding:5px; margin-left:5px; }
-  #scanBarcodeBtn { position:absolute; right:5px; top:5px; height:30px; width:30px; border:none; background:#4CAF50; color:white; border-radius:50%; font-size:18px; }
-  #clearFieldsBtn { background:#f44336; color:#fff; margin-top:10px; }
+body { margin:0; font-family:Arial; background:#f5f7fb; }
+
+#scanner { width:100%; height:55vh; background:#000; }
+
+button {
+  padding:10px; margin:5px; border:none;
+  border-radius:6px; font-size:1rem;
+}
+
+#manualAddBtn {
+  position:absolute; bottom:15px; right:15px;
+  font-size:22px; background:#4CAF50; color:white;
+  border-radius:50%; width:55px; height:55px;
+}
+
+.modal {
+  display:none; position:fixed; top:0; left:0;
+  width:100%; height:100%;
+  background:rgba(0,0,0,0.5);
+  justify-content:center; align-items:center;
+}
+
+.modal-content {
+  background:#fff; padding:20px;
+  border-radius:10px; width:90%;
+}
+
+input {
+  width:100%; padding:8px; margin:5px 0;
+}
+
+.product-row {
+  border-bottom:1px solid #ccc;
+  padding:5px; font-size:1rem;
+}
+
+#scanBarcodeBtn {
+  position:absolute; right:5px; top:5px;
+}
 </style>
 </head>
+
 <body>
 
 <div id="scanner"></div>
+
 <button id="manualAddBtn">➕</button>
 
-<div style="padding:10px; display:flex; justify-content:center; flex-wrap:wrap;">
-  <button onclick="openProductsModal()">Products</button>
+<div style="text-align:center;">
   <button onclick="startScan('search')">Search</button>
-  <button onclick="refreshPage()">Refresh</button>
+  <button onclick="startScan('pos')">POS</button>
+  <button onclick="openProducts()">Products</button>
+  <button onclick="location.reload()">Refresh</button>
 </div>
 
-<!-- Manual Add Modal -->
+<!-- ADD PRODUCT -->
 <div id="manualAddModal" class="modal">
-  <div class="modal-content">
-    <h3>Add Product Manually</h3>
-    <div style="position:relative;">
-      <input id="manualBarcodeInput" placeholder="Barcode (optional)" style="padding-right:40px;">
-      <button id="scanBarcodeBtn">📷</button>
-    </div>
-    <input id="manualNameInput" placeholder="Product Name">
-    <input id="manualPriceInput" type="number" placeholder="Price">
-    <input id="manualWholesaleInput" type="number" placeholder="Wholesale Price">
-    <div style="display:flex; justify-content:space-between; flex-wrap:wrap;">
-      <button onclick="saveManualProduct()">Save</button>
-      <button id="clearFieldsBtn" onclick="clearManualFields()">Clear</button>
-      <button onclick="closeManualModal()">Cancel</button>
-    </div>
-  </div>
+<div class="modal-content">
+<h3>Add Product</h3>
+
+<div style="position:relative;">
+<input id="manualBarcodeInput" placeholder="Barcode">
+<button id="scanBarcodeBtn">📷</button>
 </div>
 
-<!-- Products List Modal -->
-<div id="productsListModal" class="modal">
-  <div class="modal-content">
-    <h3>Saved Products</h3>
-    <div id="productsContainer"></div>
-    <button onclick="closeProductsModal()">Close</button>
-  </div>
+<input id="manualNameInput" placeholder="Name">
+<input id="manualPriceInput" placeholder="Price" type="number">
+
+<button onclick="saveProduct()">Save</button>
+<button onclick="clearFields()">Clear</button>
+<button onclick="closeModal()">Cancel</button>
+</div>
 </div>
 
-<!-- Audio -->
-<audio id="beepAudio" src="beep.mp3.wav" preload="auto"></audio>
+<!-- PRODUCTS -->
+<div id="productsModal" class="modal">
+<div class="modal-content">
+<h3>Products</h3>
+<div id="productList"></div>
+<button onclick="closeProducts()">Close</button>
+</div>
+</div>
+
+<!-- POS -->
+<div id="posModal" class="modal">
+<div class="modal-content">
+
+<h3>POS</h3>
+
+<p>Barcode: <span id="posBarcode"></span></p>
+<p>Name: <span id="posName"></span></p>
+<p>Price: ₱<span id="posPrice"></span></p>
+
+<div>
+<button onclick="changeQty(-1)">-</button>
+<input id="posQty" value="1" style="width:50px;text-align:center;">
+<button onclick="changeQty(1)">+</button>
+</div>
+
+<p>Total: ₱<span id="posTotal"></span></p>
+
+<button onclick="addToReceipt()">Add</button>
+<button onclick="closePOS()">Cancel</button>
+
+</div>
+</div>
+
+<audio id="beepAudio" src="beep.mp3.wav"></audio>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
+
 <script>
-let products = JSON.parse(localStorage.getItem('products') || '[]');
-let html5Scanner;  // Single scanner instance
-let scanMode = ''; // 'search' or 'manual'
+let products = JSON.parse(localStorage.getItem('products')||'[]');
+let receipts = JSON.parse(localStorage.getItem('receipts')||'[]');
 
-function refreshPage(){ location.reload(); }
+let scanner;
+let mode="";
+let currentProduct=null;
 
-// Manual Add
-const manualBtn = document.getElementById('manualAddBtn');
-manualBtn.addEventListener('click', ()=>{ document.getElementById('manualAddModal').style.display='flex'; });
-function closeManualModal(){ document.getElementById('manualAddModal').style.display='none'; }
-
-function clearManualFields(){
-  document.getElementById('manualBarcodeInput').value = '';
-  document.getElementById('manualNameInput').value = '';
-  document.getElementById('manualPriceInput').value = '';
-  document.getElementById('manualWholesaleInput').value = '';
-}
-
-function saveManualProduct(){
-  const barcode = document.getElementById('manualBarcodeInput').value;
-  const name = document.getElementById('manualNameInput').value;
-  const price = document.getElementById('manualPriceInput').value;
-  const wholesale = document.getElementById('manualWholesaleInput').value;
-  if(!name){ alert("Product Name is required"); return; }
-  if(barcode && products.find(p=>p.barcode===barcode)){ alert("Product already exists"); return; }
-  products.push({barcode,name,price,wholesale});
-  localStorage.setItem('products', JSON.stringify(products));
-  document.getElementById('beepAudio').play();
-  closeManualModal(); alert("Product added!");
-}
-
-// Products List Modal
-function openProductsModal(){
-  const container = document.getElementById('productsContainer');
-  container.innerHTML = '';
-  products.forEach((p,i)=>{
-    const div = document.createElement('div');
-    div.className = 'product-row';
-    div.innerHTML = `<span>${p.barcode || '-'} | ${p.name} | ₱${p.price} | ₱${p.wholesale}</span>
-      <span>
-      <button onclick="editProduct(${i})">Edit</button>
-      <button onclick="deleteProduct(${i})">Delete</button>
-      </span>`;
-    container.appendChild(div);
-  });
-  document.getElementById('productsListModal').style.display='flex';
-}
-function closeProductsModal(){ document.getElementById('productsListModal').style.display='none'; }
-function deleteProduct(i){ if(confirm("Delete this product?")){ products.splice(i,1); localStorage.setItem('products',JSON.stringify(products)); openProductsModal(); } }
-function editProduct(i){
-  const p = products[i];
-  document.getElementById('manualBarcodeInput').value = p.barcode || '';
-  document.getElementById('manualNameInput').value = p.name;
-  document.getElementById('manualPriceInput').value = p.price;
-  document.getElementById('manualWholesaleInput').value = p.wholesale;
-  document.getElementById('manualAddModal').style.display='flex';
-  closeProductsModal();
-  products.splice(i,1);
-}
-
-// Initialize scanner once
+// INIT SCANNER
 function initScanner(){
-  if(!html5Scanner){
-    html5Scanner = new Html5Qrcode("scanner");
+  if(!scanner){
+    scanner = new Html5Qrcode("scanner");
   }
 }
 
-// Start scan
-function startScan(mode){
-  scanMode = mode; // remember mode
+// START SCAN
+function startScan(m){
+  mode = m;
   initScanner();
-  Html5Qrcode.getCameras().then(cameras=>{
-    if(cameras && cameras.length){ 
-      html5Scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        qrCodeMessage => {
-          document.getElementById('beepAudio').play();
-          if(scanMode==='search'){
-            const existing = products.find(p=>p.barcode===qrCodeMessage);
-            if(existing){ alert(`Found: ${existing.name} ₱${existing.price}`); }
-            else{ alert(`Barcode: ${qrCodeMessage} not in list`); }
-          } else if(scanMode==='manual'){
-            document.getElementById('manualBarcodeInput').value = qrCodeMessage;
-            closeModalTemp();
-          }
-          html5Scanner.stop().then(()=>{}).catch(err=>console.log(err));
-        },
-        err => console.log(err)
-      );
-    }
-  }).catch(err=>alert("Camera error: "+err));
+
+  Html5Qrcode.getCameras().then(()=>{
+    scanner.start(
+      {facingMode:"environment"},
+      {fps:10, qrbox:250},
+      code=>{
+        beep();
+
+        if(mode==="search"){
+          let p = products.find(x=>x.barcode===code);
+          alert(p ? p.name+" ₱"+p.price : "Not found");
+        }
+
+        if(mode==="manual"){
+          document.getElementById("manualBarcodeInput").value = code;
+          document.getElementById("manualAddModal").style.display="flex";
+        }
+
+        if(mode==="pos"){
+          let p = products.find(x=>x.barcode===code);
+          if(p) openPOS(p);
+          else alert("Not found");
+        }
+
+        scanner.stop();
+      }
+    );
+  });
 }
 
-// Modal scanner: hide modal
-function closeModalTemp(){ document.getElementById('manualAddModal').style.display='flex'; }
+// BEEP
+function beep(){
+  document.getElementById("beepAudio").play();
+}
 
-// PWA
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js'); }
+// ADD PRODUCT
+document.getElementById("manualAddBtn").onclick=()=>{
+  document.getElementById("manualAddModal").style.display="flex";
+};
 
-// Barcode icon in modal
-document.getElementById('scanBarcodeBtn').addEventListener('click', () => {
-  document.getElementById('manualAddModal').style.display='none';
-  startScan('manual');
-});
+function closeModal(){
+  document.getElementById("manualAddModal").style.display="none";
+}
+
+function clearFields(){
+  manualBarcodeInput.value="";
+  manualNameInput.value="";
+  manualPriceInput.value="";
+}
+
+function saveProduct(){
+  let p={
+    barcode:manualBarcodeInput.value,
+    name:manualNameInput.value,
+    price:parseFloat(manualPriceInput.value)
+  };
+  products.push(p);
+  localStorage.setItem("products",JSON.stringify(products));
+  beep();
+  closeModal();
+}
+
+// CAMERA IN INPUT
+scanBarcodeBtn.onclick=()=>{
+  document.getElementById("manualAddModal").style.display="none";
+  startScan("manual");
+};
+
+// PRODUCTS LIST
+function openProducts(){
+  let list=document.getElementById("productList");
+  list.innerHTML="";
+  products.forEach(p=>{
+    let div=document.createElement("div");
+    div.className="product-row";
+    div.innerText=p.name+" ₱"+p.price;
+    list.appendChild(div);
+  });
+  document.getElementById("productsModal").style.display="flex";
+}
+
+function closeProducts(){
+  document.getElementById("productsModal").style.display="none";
+}
+
+// POS
+function openPOS(p){
+  currentProduct=p;
+
+  posBarcode.innerText=p.barcode;
+  posName.innerText=p.name;
+  posPrice.innerText=p.price;
+
+  posQty.value=1;
+  updateTotal();
+
+  posModal.style.display="flex";
+}
+
+function closePOS(){
+  posModal.style.display="none";
+}
+
+function changeQty(v){
+  let q=parseInt(posQty.value)||0;
+  q+=v;
+  if(q<0) q=0;
+  posQty.value=q;
+  updateTotal();
+}
+
+function updateTotal(){
+  let total=(posPrice.innerText * posQty.value)||0;
+  posTotal.innerText=total.toFixed(2);
+}
+
+function addToReceipt(){
+  let item={
+    name:currentProduct.name,
+    price:currentProduct.price,
+    qty:parseInt(posQty.value),
+    total:currentProduct.price * posQty.value
+  };
+
+  receipts.push(item);
+  localStorage.setItem("receipts",JSON.stringify(receipts));
+
+  beep();
+  closePOS();
+  alert("Added to receipt");
+}
 </script>
+
 </body>
 </html>
