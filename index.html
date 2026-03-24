@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POS Scanner</title>
-
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -26,6 +25,7 @@ button { padding:8px; margin:3px; border:none; border-radius:6px; font-size:0.85
 .qty-btn { padding:3px 6px; font-size:0.8rem;}
 #cartSearchResults { max-height:100px; overflow-y:auto; margin-bottom:5px; }
 #printReceiptDiv { position:absolute; left:-9999px;}
+
 /* Add Product Modal Modern Style */
 #manualAddModal .modal-content {
   max-width:350px; padding:20px; border-radius:12px; box-shadow:0 5px 15px rgba(0,0,0,0.3); background:#fff;
@@ -35,6 +35,7 @@ button { padding:8px; margin:3px; border:none; border-radius:6px; font-size:0.85
 #manualAddModal #scanBtn { position:absolute; right:5px; top:5px; background:#2196F3; color:white; border-radius:6px; width:35px; height:35px; font-size:16px; border:none; }
 #manualAddModal div[style*="display:flex"] button { flex:1; margin-right:5px; font-weight:bold; }
 #manualAddModal div[style*="display:flex"] button:last-child { margin-right:0; }
+
 @media print {
   body * { visibility:hidden; }
   #printReceiptDiv, #printReceiptDiv * { visibility:visible; }
@@ -112,7 +113,7 @@ button { padding:8px; margin:3px; border:none; border-radius:6px; font-size:0.85
 </div>
 
 <audio id="beepAudio" src="beep.mp3.wav"></audio>
-<script src="https://unpkg.com/html5-qrcode?version=2"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.7/minified/html5-qrcode.min.js"></script>
 
 <script>
 let products = JSON.parse(localStorage.getItem('products')||'[]');
@@ -121,6 +122,7 @@ let scanner;
 let mode="";
 let lastScanTime=0;
 
+/* SOUND */
 function beep(){ document.getElementById("beepAudio").play(); }
 
 /* SCANNER */
@@ -132,24 +134,41 @@ function startScan(m){
     scanner.start({facingMode:"environment"},{fps:10,qrbox:250},
       code=>{
         beep();
-        if(mode==="add"){ document.getElementById("barcode").value = code; document.getElementById("manualAddModal").style.display="flex"; scanner.stop(); }
+        if(mode==="add"){ 
+          document.getElementById("barcode").value = code; 
+          document.getElementById("manualAddModal").style.display="flex"; 
+          scanner.stop(); 
+        }
         if(mode==="pos") handlePOSScan(code);
-        if(mode==="search"){ let p=products.find(x=>x.barcode===code); alert(p?`${p.name} ₱${p.price} Stock:${p.stock}`:"Not found"); scanner.stop(); }
+        if(mode==="search"){ 
+          let p=products.find(x=>x.barcode===code); 
+          alert(p?`${p.name} ₱${p.price} Stock:${p.stock}`:"Not found"); 
+          scanner.stop(); 
+        }
       });
   });
 }
 
 /* CAMERA BUTTON */
-document.getElementById("scanBtn").onclick = function(){ document.getElementById("manualAddModal").style.display="none"; startScan("add"); };
+document.getElementById("scanBtn").onclick = function(){
+  document.getElementById("manualAddModal").style.display="none"; 
+  startScan("add"); 
+};
 
 /* POS */
 function handlePOSScan(code){
-  let now=Date.now(); if(now-lastScanTime<2000) return; lastScanTime=now;
-  let p=products.find(x=>x.barcode===code); if(!p){ alert("Not found"); return; }
+  let now=Date.now(); 
+  if(now-lastScanTime<2000) return; 
+  lastScanTime=now;
+  let p=products.find(x=>x.barcode===code); 
+  if(!p){ alert("Not found"); return; }
   if(p.stock<=0){ alert("Out of stock"); return; }
   let e=cart.find(i=>i.barcode===code);
-  if(e){ e.qty++; e.total=e.qty*e.price; } else cart.push({barcode:p.barcode,name:p.name,price:p.price,qty:1,total:p.price});
-  p.stock--; saveProducts(); updateCartUI();
+  if(e){ e.qty++; e.total=e.qty*e.price; } 
+  else cart.push({barcode:p.barcode,name:p.name,price:p.price,qty:1,total:p.price});
+  p.stock--; 
+  saveProducts(); 
+  updateCartUI();
 }
 
 /* CART */
@@ -169,24 +188,38 @@ function updateCartUI(){
   });
   document.getElementById("cartTotal").innerText=total.toFixed(2);
 }
+
 function changeQty(i,d){ let item=cart[i]; let p=products.find(x=>x.barcode===item.barcode); item.qty+=d; if(item.qty<0)item.qty=0; p.stock-=d; if(p.stock<0)p.stock=0; item.total=item.qty*item.price; saveProducts(); updateCartUI(); }
 function removeItem(i){ let item=cart[i]; let p=products.find(x=>x.barcode===item.barcode); p.stock+=item.qty; cart.splice(i,1); saveProducts(); updateCartUI(); }
 function clearCart(){ cart.forEach(item=>{ let p=products.find(x=>x.barcode===item.barcode); p.stock+=item.qty; }); cart=[]; saveProducts(); updateCartUI(); }
 
 /* CART SEARCH */
-function filterCartSearch(){ let input=document.getElementById("cartSearchInput").value.toLowerCase(); let resultsDiv=document.getElementById("cartSearchResults"); resultsDiv.innerHTML="";
+function filterCartSearch(){ 
+  let input=document.getElementById("cartSearchInput").value.toLowerCase(); 
+  let resultsDiv=document.getElementById("cartSearchResults"); resultsDiv.innerHTML="";
   if(input==="") return;
   let matches=products.filter(p=>p.name.toLowerCase().includes(input));
-  matches.forEach(p=>{ let div=document.createElement("div"); div.style.padding="3px"; div.style.borderBottom="1px solid #ccc"; div.style.cursor="pointer";
+  matches.forEach(p=>{ 
+    let div=document.createElement("div"); div.style.padding="3px"; div.style.borderBottom="1px solid #ccc"; div.style.cursor="pointer";
     div.textContent=`${p.name} ₱${p.price} [${p.stock}]`;
     div.onclick=function(){ addToCartFromSearch(p.barcode); document.getElementById("cartSearchInput").value=""; resultsDiv.innerHTML=""; };
     resultsDiv.appendChild(div);
   });
 }
-function addToCartFromSearch(barcode){ let p=products.find(x=>x.barcode===barcode); if(!p){ alert("Product not found"); return; } if(p.stock <=0){ alert("Out of stock"); return; } let item=cart.find(i=>i.barcode===barcode); if(item){ item.qty++; item.total=item.qty*item.price; } else cart.push({barcode:p.barcode,name:p.name,price:p.price,qty:1,total:p.price}); p.stock--; saveProducts(); updateCartUI(); }
+
+function addToCartFromSearch(barcode){ 
+  let p=products.find(x=>x.barcode===barcode); 
+  if(!p){ alert("Product not found"); return; } 
+  if(p.stock <=0){ alert("Out of stock"); return; } 
+  let item=cart.find(i=>i.barcode===barcode); 
+  if(item){ item.qty++; item.total=item.qty*item.price; } 
+  else cart.push({barcode:p.barcode,name:p.name,price:p.price,qty:1,total:p.price}); 
+  p.stock--; saveProducts(); updateCartUI(); 
+}
 
 /* PRODUCTS */
-function openProducts(){ let list=document.getElementById("productList"); list.innerHTML="";
+function openProducts(){ 
+  let list=document.getElementById("productList"); list.innerHTML="";
   if(products.length===0){ list.innerHTML="<p>No products yet.</p>"; document.getElementById("productsModal").style.display="flex"; return; }
   let sortedProducts=products.slice().sort((a,b)=>a.name.localeCompare(b.name));
   sortedProducts.forEach(p=>{ let div=document.createElement("div"); div.className="product-row"; div.style.color=(p.stock<=0)?"red":"black";
@@ -196,16 +229,73 @@ function openProducts(){ let list=document.getElementById("productList"); list.i
     list.appendChild(div);
   }); document.getElementById("productsModal").style.display="flex";
 }
+
 function deleteProductByBarcode(barcode){ let index=products.findIndex(p=>p.barcode===barcode); if(index!==-1 && confirm("Delete product?")){ products.splice(index,1); localStorage.setItem("products",JSON.stringify(products)); openProducts(); } }
-function editProduct(barcode){ let p=products.find(x=>x.barcode===barcode); if(!p) return; document.getElementById("barcode").value=p.barcode; document.getElementById("name").value=p.name; document.getElementById("price").value=p.price; document.getElementById("stock").value=p.stock; document.getElementById("productsModal").style.display="none"; document.getElementById("manualAddModal").style.display="flex";
-  document.getElementById("saveBtn").onclick=function(){ p.name=document.getElementById("name").value; p.price=parseFloat(document.getElementById("price").value)||0; p.stock=parseInt(document.getElementById("stock").value)||0; localStorage.setItem("products",JSON.stringify(products)); clearFields(); closeAdd(); openProducts(); document.getElementById("saveBtn").onclick=saveProduct; }; }
+
+function editProduct(barcode){ 
+  let p=products.find(x=>x.barcode===barcode); if(!p) return; 
+  document.getElementById("barcode").value=p.barcode; 
+  document.getElementById("name").value=p.name; 
+  document.getElementById("price").value=p.price; 
+  document.getElementById("stock").value=p.stock; 
+  document.getElementById("productsModal").style.display="none"; 
+  document.getElementById("manualAddModal").style.display="flex";
+
+  document.getElementById("saveBtn").onclick=function(){ 
+    const barcodeInput = document.getElementById("barcode");
+    const nameInput = document.getElementById("name");
+    const priceInput = document.getElementById("price");
+    const stockInput = document.getElementById("stock");
+
+    if(!barcodeInput.value.trim() || !nameInput.value.trim()){ alert("Fill barcode and name"); return; } 
+
+    p.barcode = barcodeInput.value.trim();
+    p.name = nameInput.value.trim();
+    p.price = parseFloat(priceInput.value) || 0;
+    p.stock = parseInt(stockInput.value) || 0;
+    localStorage.setItem("products",JSON.stringify(products));
+    clearFields(); closeAdd(); openProducts(); 
+    document.getElementById("saveBtn").onclick=saveProduct; 
+  }; 
+}
+
 function closeProducts(){ document.getElementById("productsModal").style.display="none"; }
 
 /* ADD PRODUCT */
 function openAddModal(){ document.getElementById("manualAddModal").style.display="flex"; }
 function closeAdd(){ document.getElementById("manualAddModal").style.display="none"; }
-function clearFields(){ barcode.value=""; name.value=""; price.value=""; stock.value=""; }
-function saveProduct(){ if(!barcode.value || !name.value){ alert("Fill barcode and name"); return; } let existing=products.find(p=>p.barcode===barcode.value); if(existing){ alert("Product already exists"); return; } products.push({barcode:barcode.value,name:name.value,price:parseFloat(price.value)||0,stock:parseInt(stock.value)||0}); localStorage.setItem("products",JSON.stringify(products)); clearFields(); closeAdd(); openProducts(); }
+function clearFields(){ document.getElementById("barcode").value=""; document.getElementById("name").value=""; document.getElementById("price").value=""; document.getElementById("stock").value=""; }
+
+function saveProduct(){ 
+    const barcodeInput = document.getElementById("barcode");
+    const nameInput = document.getElementById("name");
+    const priceInput = document.getElementById("price");
+    const stockInput = document.getElementById("stock");
+
+    if(!barcodeInput.value.trim() || !nameInput.value.trim()){ 
+        alert("Fill barcode and name"); 
+        return; 
+    } 
+
+    let existing = products.find(p => p.barcode === barcodeInput.value.trim()); 
+    if(existing){ 
+        alert("Product already exists"); 
+        return; 
+    } 
+
+    products.push({
+        barcode: barcodeInput.value.trim(),
+        name: nameInput.value.trim(),
+        price: parseFloat(priceInput.value) || 0,
+        stock: parseInt(stockInput.value) || 0
+    }); 
+
+    localStorage.setItem("products", JSON.stringify(products)); 
+    clearFields(); 
+    closeAdd(); 
+    openProducts(); 
+}
+
 function saveProducts(){ localStorage.setItem("products",JSON.stringify(products)); }
 
 /* CART MODAL */
@@ -213,7 +303,10 @@ function openCart(){ document.getElementById("posCartModal").style.display="flex
 function closeCart(){ document.getElementById("posCartModal").style.display="none"; }
 
 /* PRINT */
-function printReceipt(){ if(cart.length===0){ alert("Empty"); return; } let body=document.getElementById("receiptBody"); body.innerHTML=""; let total=0;
+function printReceipt(){ 
+  if(cart.length===0){ alert("Empty"); return; } 
+  let body=document.getElementById("receiptBody"); body.innerHTML=""; 
+  let total=0;
   cart.forEach(item=>{ total+=item.total; let tr=document.createElement("tr"); tr.innerHTML=`<td>${item.name}</td><td>${item.qty}</td><td>₱${item.total.toFixed(2)}</td>`; body.appendChild(tr); });
   document.getElementById("receiptTotal").innerText=total.toFixed(2);
   document.getElementById("receiptDate").innerText=new Date().toLocaleString();
