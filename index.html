@@ -56,13 +56,22 @@ input { width:100%; padding:8px; margin:5px 0; }
 </div>
 </div>
 
-<!-- Products List Modal -->
+<!-- Products List Modal (Clean with red highlight if out-of-stock) -->
 <div id="productsModal" class="modal">
 <div class="modal-content">
 <span class="close-btn" onclick="closeProducts()">×</span>
 <h3>Products</h3>
 <div id="productList"></div>
 </div>
+</div>
+
+<!-- Search Result Modal (with Edit/Delete and red stock highlight) -->
+<div id="searchResultModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeSearchResult()">×</span>
+    <h3>Search Result</h3>
+    <div id="searchResultContent"></div>
+  </div>
 </div>
 
 <!-- POS Cart Modal -->
@@ -86,7 +95,7 @@ let products = JSON.parse(localStorage.getItem('products')||'[]');
 let cart = [];
 let scanner;
 let mode="";
-let lastScanTime = 0; // 2-second interval for POS
+let lastScanTime = 0;
 let editingBarcode = null;
 
 // Initialize scanner
@@ -101,7 +110,6 @@ function startScan(m){
   mode = m;
   document.getElementById("posControls").style.display = (mode === "pos") ? "block" : "none";
   initScanner();
-
   Html5Qrcode.getCameras().then(()=>{
     scanner.start(
       {facingMode:"environment"},
@@ -111,7 +119,7 @@ function startScan(m){
         if(mode==="search"){
           let p = products.find(x=>x.barcode===code);
           if(p){
-            alert(`${p.name} ₱${p.price} (Stock: ${p.stock})`);
+            showSearchResult(p);
           } else {
             alert("Product not found");
           }
@@ -133,7 +141,7 @@ function startScan(m){
   });
 }
 
-// Beep sound
+// Beep
 function beep(){ document.getElementById("beepAudio").play(); }
 
 // Manual Add
@@ -186,32 +194,44 @@ scanBarcodeBtn.onclick=()=>{
   startScan("manual");
 };
 
-// Products List with edit/delete and show stock
+// Products List (Clean + red for out-of-stock)
 function openProducts(){
-  let list=document.getElementById("productList");
-  list.innerHTML="";
+  let list = document.getElementById("productList");
+  list.innerHTML = "";
   products.forEach(p=>{
-    let div=document.createElement("div");
-    div.className="product-row";
-    div.innerHTML = `
-      ${p.name} ₱${p.price} (Stock: ${p.stock})
-      <div>
-        <button onclick="editProduct('${p.barcode}')">Edit</button>
-        <button onclick="deleteProduct('${p.barcode}')">Delete</button>
-      </div>
-    `;
+    let div = document.createElement("div");
+    div.className = "product-row";
+    div.style.color = (p.stock <=0) ? "red":"black";
+    div.innerHTML = `${p.name} ₱${p.price} (Stock: ${p.stock})`;
     list.appendChild(div);
   });
-  document.getElementById("productsModal").style.display="flex";
+  document.getElementById("productsModal").style.display = "flex";
 }
-function closeProducts(){ document.getElementById("productsModal").style.display="none"; }
-function deleteProduct(code){
+function closeProducts(){ document.getElementById("productsModal").style.display = "none"; }
+
+// Search Modal functions
+function showSearchResult(product){
+  let content = document.getElementById("searchResultContent");
+  content.innerHTML = `
+    <p>Name: <span style="color:${product.stock <= 0 ? 'red':'black'}">${product.name}</span></p>
+    <p>Price: ₱${product.price}</p>
+    <p>Stock: <span style="color:${product.stock <= 0 ? 'red':'black'}">${product.stock}</span></p>
+    <button onclick="editProductFromSearch('${product.barcode}')">Edit</button>
+    <button onclick="deleteProductFromSearch('${product.barcode}')">Delete</button>
+  `;
+  document.getElementById("searchResultModal").style.display = "flex";
+}
+function closeSearchResult(){ document.getElementById("searchResultModal").style.display="none"; }
+function editProductFromSearch(barcode){ closeSearchResult(); editProduct(barcode); }
+function deleteProductFromSearch(barcode){
   if(confirm("Delete this product?")){
-    products = products.filter(p=>p.barcode!==code);
-    localStorage.setItem("products",JSON.stringify(products));
-    openProducts();
+    products = products.filter(p=>p.barcode!==barcode);
+    localStorage.setItem("products", JSON.stringify(products));
+    closeSearchResult();
   }
 }
+
+// Edit product (Add Product modal)
 function editProduct(code){
   let p = products.find(p=>p.barcode===code);
   if(p){
@@ -220,14 +240,12 @@ function editProduct(code){
     manualPriceInput.value = p.price;
     manualStockInput.value = p.stock || 0;
     editingBarcode = code;
-
-    // Hide products modal and show Add Product modal
     closeProducts();
     document.getElementById("manualAddModal").style.display="flex";
   }
 }
 
-// POS Bulk Scan with 2-second interval & stock decrease
+// POS Bulk Scan
 function handlePOSScan(code){
   let now = Date.now();
   if(now - lastScanTime < 2000) return;
@@ -250,7 +268,6 @@ function handlePOSScan(code){
     cart.push({barcode:product.barcode,name:product.name,price:product.price,qty:1,total:product.price});
   }
 
-  // Decrease stock
   product.stock -= 1;
   localStorage.setItem("products",JSON.stringify(products));
 
@@ -258,7 +275,7 @@ function handlePOSScan(code){
   updateCartUI();
 }
 
-// Cart UI with +/- buttons
+// Cart UI
 function updateCartUI(){
   let container = document.getElementById("cartItems");
   container.innerHTML="";
@@ -284,22 +301,13 @@ function updateCartUI(){
 function changeQty(index, delta){
   let item = cart[index];
   let product = products.find(p=>p.barcode===item.barcode);
-
-  if(delta>0 && item.qty >= product.stock){
-    alert("Cannot add more than stock!");
-    return;
-  }
-
+  if(delta>0 && item.qty >= product.stock){ alert("Cannot add more than stock!"); return; }
   item.qty += delta;
   if(item.qty < 0) item.qty = 0;
-
-  // Adjust stock in products
   product.stock -= delta;
   if(product.stock < 0) product.stock = 0;
-
   item.total = item.qty * item.price;
   localStorage.setItem("products",JSON.stringify(products));
-
   updateCartUI();
 }
 
@@ -308,14 +316,14 @@ function closeCart(){ document.getElementById("posCartModal").style.display="non
 function clearCart(){ 
   cart.forEach(item=>{
     let product = products.find(p=>p.barcode===item.barcode);
-    product.stock += item.qty; // return stock when cleared
+    product.stock += item.qty;
   });
   cart=[];
   localStorage.setItem("products",JSON.stringify(products));
   updateCartUI(); 
 }
 
-// Print Receipt
+// Print receipt
 function printReceipt(){
   if(cart.length===0){ alert("Cart is empty"); return; }
   let total = 0;
