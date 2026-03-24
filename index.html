@@ -15,16 +15,16 @@ input { width:100%; padding:8px; margin:5px 0; }
 .product-row { border-bottom:1px solid #ccc; padding:5px; font-size:1rem; display:flex; justify-content:space-between; align-items:center; }
 #scanBarcodeBtn { position:absolute; right:5px; top:5px; }
 .close-btn { position:absolute; top:10px; right:10px; background:#ccc; border-radius:50%; width:25px; height:25px; font-weight:bold; line-height:25px; text-align:center; cursor:pointer; }
-#posControls { margin-top:10px; text-align:center; }
+#posControls { text-align:center; margin:10px 0; }
 </style>
 </head>
 <body>
 
 <div id="scanner"></div>
 
-<!-- POS Cart button inside scanner -->
-<div style="text-align:center;" id="posControls" hidden>
-  <button onclick="openCart()">Cart</button>
+<!-- POS Cart button BELOW scanner -->
+<div id="posControls" hidden>
+  <button style="padding:12px 20px; font-size:1rem;" onclick="openCart()">Cart</button>
 </div>
 
 <button id="manualAddBtn">➕</button>
@@ -94,8 +94,6 @@ function initScanner(){
 function startScan(m){
   mode = m;
   initScanner();
-
-  // Show POS Cart button only in POS mode
   document.getElementById("posControls").hidden = (mode !== "pos");
 
   Html5Qrcode.getCameras().then(()=>{
