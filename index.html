@@ -3,16 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>POS Scanner Full</title>
+<title>POS Scanner</title>
+
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
 <style>
 body { margin:0; font-family:Arial; background:#f5f7fb; }
 .topbar { position:sticky; top:0; background:#fff; z-index:1000; padding:5px; text-align:center; box-shadow:0 2px 5px rgba(0,0,0,0.1);}
-#scanner { width:100%; height:45vh; background:#000; display:none; }
+#scanner { width:100%; height:45vh; background:#000; }
 button { padding:8px; margin:3px; border:none; border-radius:6px; font-size:0.85rem; }
 #manualAddBtn { position:fixed; bottom:80px; right:15px; z-index:1000; font-size:22px; background:#4CAF50; color:white; border-radius:50%; width:55px; height:55px;}
 #posControls { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); z-index:1000; display:none;}
 .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center;}
-.modal-content { background:#fff; padding:20px; border-radius:10px; width:90%; max-width:400px; position:relative;}
+.modal-content { background:#fff; padding:20px; border-radius:10px; width:90%; max-width:400px;}
 .product-row { display:flex; justify-content:space-between; align-items:center; padding:6px; border-bottom:1px solid #ccc;}
 .product-row div { display:flex; gap:5px; }
 .small-btn { font-size:0.7rem; padding:3px 6px; color:white; border-radius:4px; }
@@ -21,14 +26,27 @@ button { padding:8px; margin:3px; border:none; border-radius:6px; font-size:0.85
 .qty-btn { padding:3px 6px; font-size:0.8rem;}
 #cartSearchResults { max-height:100px; overflow-y:auto; margin-bottom:5px; }
 #printReceiptDiv { position:absolute; left:-9999px;}
-#manualAddModal input, #manualAddModal button { margin-bottom:5px; }
-#scanBtn { position:absolute; right:5px; top:5px; width:35px; height:35px; font-size:16px; background:#2196F3; color:white; border:none; border-radius:6px;}
+/* Add Product Modal Modern Style */
+#manualAddModal .modal-content {
+  max-width:350px; padding:20px; border-radius:12px; box-shadow:0 5px 15px rgba(0,0,0,0.3); background:#fff;
+}
+#manualAddModal h3 { text-align:center; margin-bottom:15px; color:#4CAF50; }
+#manualAddModal input { width:100%; padding:10px; margin-bottom:12px; border-radius:8px; border:1px solid #ccc; font-size:1rem; }
+#manualAddModal #scanBtn { position:absolute; right:5px; top:5px; background:#2196F3; color:white; border-radius:6px; width:35px; height:35px; font-size:16px; border:none; }
+#manualAddModal div[style*="display:flex"] button { flex:1; margin-right:5px; font-weight:bold; }
+#manualAddModal div[style*="display:flex"] button:last-child { margin-right:0; }
+@media print {
+  body * { visibility:hidden; }
+  #printReceiptDiv, #printReceiptDiv * { visibility:visible; }
+  #printReceiptDiv { position:absolute; top:0; left:0; width:100%; }
+}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <button onclick="startScan('pos')">POS Scanner</button>
+  <button onclick="startScan('search')">Search</button>
+  <button onclick="startScan('pos')">POS</button>
   <button onclick="openProducts()">Products</button>
   <button onclick="location.reload()">Refresh</button>
 </div>
@@ -45,14 +63,14 @@ button { padding:8px; margin:3px; border:none; border-radius:6px; font-size:0.85
 <div id="manualAddModal" class="modal">
   <div class="modal-content">
     <h3>Add Product</h3>
-    <div style="position:relative;">
-      <input id="barcode" placeholder="Barcode (manual)">
+    <div style="position:relative; margin-bottom:12px;">
+      <input id="barcode" placeholder="Barcode">
       <button id="scanBtn">📷</button>
     </div>
     <input id="name" placeholder="Name">
     <input id="price" type="number" placeholder="Price">
     <input id="stock" type="number" placeholder="Stock">
-    <div style="display:flex; justify-content:space-between;">
+    <div style="display:flex; justify-content:space-between; margin-top:10px;">
       <button id="saveBtn" onclick="saveProduct()" style="background:#4CAF50; color:white;">Save</button>
       <button onclick="clearFields()" style="background:#f0ad4e; color:white;">Clear</button>
       <button onclick="closeAdd()" style="background:#d9534f; color:white;">Close</button>
@@ -62,128 +80,79 @@ button { padding:8px; margin:3px; border:none; border-radius:6px; font-size:0.85
 
 <!-- PRODUCTS MODAL -->
 <div id="productsModal" class="modal">
-  <div class="modal-content">
-    <h3>Products</h3>
-    <div id="productList"></div>
-    <button onclick="closeProducts()">Close</button>
-  </div>
+<div class="modal-content">
+<h3>Products</h3>
+<div id="productList"></div>
+<button onclick="closeProducts()">Close</button>
+</div>
 </div>
 
 <!-- CART MODAL -->
 <div id="posCartModal" class="modal">
-  <div class="modal-content">
-    <h3>Cart</h3>
-    <input id="cartSearchInput" placeholder="Search product..." oninput="filterCartSearch()">
-    <div id="cartSearchResults"></div>
-    <div id="cartItems"></div>
-    <h3>Total: ₱<span id="cartTotal">0</span></h3>
-    <button onclick="clearCart()">Clear</button>
-    <button onclick="printReceipt()">Print</button>
-    <button onclick="closeCart()">Close</button>
-  </div>
+<div class="modal-content">
+<h3>Cart</h3>
+<input id="cartSearchInput" placeholder="Search product..." oninput="filterCartSearch()">
+<div id="cartSearchResults"></div>
+<div id="cartItems"></div>
+<h3>Total: ₱<span id="cartTotal">0</span></h3>
+<button onclick="clearCart()">Clear</button>
+<button onclick="printReceipt()">Print</button>
+<button onclick="closeCart()">Close</button>
+</div>
 </div>
 
 <!-- RECEIPT -->
 <div id="printReceiptDiv">
-  <h2 style="text-align:center;">STORE RECEIPT</h2>
-  <p id="receiptDate"></p>
-  <table style="width:100%;">
-    <tbody id="receiptBody"></tbody>
-  </table>
-  <h3>Total: ₱<span id="receiptTotal"></span></h3>
+<h2 style="text-align:center;">STORE RECEIPT</h2>
+<p id="receiptDate"></p>
+<table style="width:100%;">
+<tbody id="receiptBody"></tbody>
+</table>
+<h3>Total: ₱<span id="receiptTotal"></span></h3>
 </div>
 
 <audio id="beepAudio" src="beep.mp3.wav"></audio>
-<script src="https://unpkg.com/html5-qrcode@2.3.7/minified/html5-qrcode.min.js"></script>
-<script>
-let products=JSON.parse(localStorage.getItem('products')||'[]');
-let cart=[];
-let scanner;
-let lastScan=0;
+<script src="https://unpkg.com/html5-qrcode?version=2"></script>
 
-/* Beep sound */
+<script>
+let products = JSON.parse(localStorage.getItem('products')||'[]');
+let cart = [];
+let scanner;
+let mode="";
+let lastScanTime=0;
+
 function beep(){ document.getElementById("beepAudio").play(); }
 
-/* ------------------ SCANNER ------------------ */
-function startScan(mode){
-  document.getElementById("scanner").style.display="block";
-  if(mode==="pos") document.getElementById("posControls").style.display="block";
-  if(mode==="add") document.getElementById("manualAddModal").style.display="none";
-
-  if(!scanner) scanner=new Html5Qrcode("scanner");
-  else scanner.stop().catch(()=>{});
-
-  scanner.start({facingMode:{exact:"environment"}},{fps:10,qrbox:250},
-    code=>{
-      let now=Date.now(); if(now-lastScan<2000) return; lastScan=now;
-      beep();
-      if(mode==="pos"){ addToCart(code); updateCartUI(); }
-      else if(mode==="add"){ document.getElementById("barcode").value=code; closeScanner(); }
-    },
-    err=>{}
-  ).catch(err=>{ alert("Camera unavailable, use manual input."); });
-}
-
-function closeScanner(){ 
-  if(scanner) scanner.stop().catch(()=>{}); 
-  document.getElementById("scanner").style.display="none"; 
-  document.getElementById("manualAddModal").style.display="flex";
-}
-
-/* Camera button in Add Product */
-document.getElementById("scanBtn").onclick=function(){ startScan("add"); };
-
-/* ------------------ ADD PRODUCT ------------------ */
-function openAddModal(){ document.getElementById("manualAddModal").style.display="flex"; }
-function closeAdd(){ document.getElementById("manualAddModal").style.display="none"; }
-function clearFields(){ document.getElementById("barcode").value=""; document.getElementById("name").value=""; document.getElementById("price").value=""; document.getElementById("stock").value=""; }
-
-function saveProduct(){ 
-    const barcode=document.getElementById("barcode").value.trim();
-    const name=document.getElementById("name").value.trim();
-    const price=parseFloat(document.getElementById("price").value)||0;
-    const stock=parseInt(document.getElementById("stock").value)||0;
-    if(!barcode||!name){ alert("Fill barcode and name"); return; }
-    let existing=products.find(p=>p.barcode===barcode);
-    if(existing){ alert("Product exists"); return; }
-    products.push({barcode,name,price,stock});
-    localStorage.setItem("products",JSON.stringify(products));
-    clearFields(); closeAdd(); openProducts();
-}
-
-/* ------------------ PRODUCTS ------------------ */
-function openProducts(){
-  let list=document.getElementById("productList"); list.innerHTML="";
-  let sorted=products.slice().sort((a,b)=>a.name.localeCompare(b.name));
-  sorted.forEach(p=>{
-    let div=document.createElement("div"); div.className="product-row";
-    div.innerHTML=`<span>${p.name} ₱${p.price} [${p.stock}]</span>
-    <div>
-      <button class="small-btn edit-btn" onclick="editProduct('${p.barcode}')">Edit</button>
-      <button class="small-btn delete-btn" onclick="deleteProduct('${p.barcode}')">Del</button>
-    </div>`;
-    list.appendChild(div);
+/* SCANNER */
+function startScan(m){
+  mode=m;
+  document.getElementById("posControls").style.display = (m==="pos")?"block":"none";
+  if(!scanner) scanner = new Html5Qrcode("scanner");
+  Html5Qrcode.getCameras().then(()=>{
+    scanner.start({facingMode:"environment"},{fps:10,qrbox:250},
+      code=>{
+        beep();
+        if(mode==="add"){ document.getElementById("barcode").value = code; document.getElementById("manualAddModal").style.display="flex"; scanner.stop(); }
+        if(mode==="pos") handlePOSScan(code);
+        if(mode==="search"){ let p=products.find(x=>x.barcode===code); alert(p?`${p.name} ₱${p.price} Stock:${p.stock}`:"Not found"); scanner.stop(); }
+      });
   });
-  document.getElementById("productsModal").style.display="flex";
 }
-function closeProducts(){ document.getElementById("productsModal").style.display="none"; }
-function deleteProduct(barcode){ if(confirm("Delete product?")){ products=products.filter(p=>p.barcode!==barcode); localStorage.setItem("products",JSON.stringify(products)); openProducts(); } }
-function editProduct(barcode){ let p=products.find(x=>x.barcode===barcode); if(!p) return; document.getElementById("barcode").value=p.barcode; document.getElementById("name").value=p.name; document.getElementById("price").value=p.price; document.getElementById("stock").value=p.stock; closeProducts(); openAddModal(); }
 
-/* ------------------ CART ------------------ */
-function openCart(){ document.getElementById("posCartModal").style.display="flex"; updateCartUI(); }
-function closeCart(){ document.getElementById("posCartModal").style.display="none"; }
+/* CAMERA BUTTON */
+document.getElementById("scanBtn").onclick = function(){ document.getElementById("manualAddModal").style.display="none"; startScan("add"); };
 
-function addToCart(barcode){
-  let p=products.find(x=>x.barcode===barcode);
-  if(!p){ alert("Not found"); return; }
+/* POS */
+function handlePOSScan(code){
+  let now=Date.now(); if(now-lastScanTime<2000) return; lastScanTime=now;
+  let p=products.find(x=>x.barcode===code); if(!p){ alert("Not found"); return; }
   if(p.stock<=0){ alert("Out of stock"); return; }
-  let item=cart.find(i=>i.barcode===barcode);
-  if(item){ item.qty++; item.total=item.qty*item.price; } 
-  else cart.push({barcode:p.barcode,name:p.name,price:p.price,qty:1,total:p.price});
-  p.stock--; localStorage.setItem("products",JSON.stringify(products)); updateCartUI();
+  let e=cart.find(i=>i.barcode===code);
+  if(e){ e.qty++; e.total=e.qty*e.price; } else cart.push({barcode:p.barcode,name:p.name,price:p.price,qty:1,total:p.price});
+  p.stock--; saveProducts(); updateCartUI();
 }
 
+/* CART */
 function updateCartUI(){
   let c=document.getElementById("cartItems"); c.innerHTML=""; let total=0;
   cart.forEach((item,i)=>{ total+=item.total;
@@ -200,29 +169,51 @@ function updateCartUI(){
   });
   document.getElementById("cartTotal").innerText=total.toFixed(2);
 }
+function changeQty(i,d){ let item=cart[i]; let p=products.find(x=>x.barcode===item.barcode); item.qty+=d; if(item.qty<0)item.qty=0; p.stock-=d; if(p.stock<0)p.stock=0; item.total=item.qty*item.price; saveProducts(); updateCartUI(); }
+function removeItem(i){ let item=cart[i]; let p=products.find(x=>x.barcode===item.barcode); p.stock+=item.qty; cart.splice(i,1); saveProducts(); updateCartUI(); }
+function clearCart(){ cart.forEach(item=>{ let p=products.find(x=>x.barcode===item.barcode); p.stock+=item.qty; }); cart=[]; saveProducts(); updateCartUI(); }
 
-function changeQty(i,d){ let item=cart[i]; let p=products.find(x=>x.barcode===item.barcode); item.qty+=d; if(item.qty<0)item.qty=0; p.stock-=d; if(p.stock<0)p.stock=0; item.total=item.qty*item.price; localStorage.setItem("products",JSON.stringify(products)); updateCartUI(); }
-function removeItem(i){ let item=cart[i]; let p=products.find(x=>x.barcode===item.barcode); p.stock+=item.qty; cart.splice(i,1); localStorage.setItem("products",JSON.stringify(products)); updateCartUI(); }
-function clearCart(){ cart.forEach(item=>{ let p=products.find(x=>x.barcode===item.barcode); p.stock+=item.qty; }); cart=[]; localStorage.setItem("products",JSON.stringify(products)); updateCartUI(); }
-
-function filterCartSearch(){ 
-  let input=document.getElementById("cartSearchInput").value.toLowerCase(); 
-  let resultsDiv=document.getElementById("cartSearchResults"); resultsDiv.innerHTML="";
-  if(!input) return;
+/* CART SEARCH */
+function filterCartSearch(){ let input=document.getElementById("cartSearchInput").value.toLowerCase(); let resultsDiv=document.getElementById("cartSearchResults"); resultsDiv.innerHTML="";
+  if(input==="") return;
   let matches=products.filter(p=>p.name.toLowerCase().includes(input));
-  matches.forEach(p=>{ 
-    let div=document.createElement("div"); div.style.padding="3px"; div.style.borderBottom="1px solid #ccc"; div.style.cursor="pointer";
+  matches.forEach(p=>{ let div=document.createElement("div"); div.style.padding="3px"; div.style.borderBottom="1px solid #ccc"; div.style.cursor="pointer";
     div.textContent=`${p.name} ₱${p.price} [${p.stock}]`;
-    div.onclick=function(){ addToCart(p.barcode); document.getElementById("cartSearchInput").value=""; resultsDiv.innerHTML=""; };
+    div.onclick=function(){ addToCartFromSearch(p.barcode); document.getElementById("cartSearchInput").value=""; resultsDiv.innerHTML=""; };
     resultsDiv.appendChild(div);
   });
 }
+function addToCartFromSearch(barcode){ let p=products.find(x=>x.barcode===barcode); if(!p){ alert("Product not found"); return; } if(p.stock <=0){ alert("Out of stock"); return; } let item=cart.find(i=>i.barcode===barcode); if(item){ item.qty++; item.total=item.qty*item.price; } else cart.push({barcode:p.barcode,name:p.name,price:p.price,qty:1,total:p.price}); p.stock--; saveProducts(); updateCartUI(); }
 
-/* ------------------ PRINT ------------------ */
-function printReceipt(){ 
-  if(cart.length===0){ alert("Empty"); return; } 
-  let body=document.getElementById("receiptBody"); body.innerHTML=""; 
-  let total=0;
+/* PRODUCTS */
+function openProducts(){ let list=document.getElementById("productList"); list.innerHTML="";
+  if(products.length===0){ list.innerHTML="<p>No products yet.</p>"; document.getElementById("productsModal").style.display="flex"; return; }
+  let sortedProducts=products.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  sortedProducts.forEach(p=>{ let div=document.createElement("div"); div.className="product-row"; div.style.color=(p.stock<=0)?"red":"black";
+    div.innerHTML=`<span>${p.name} ₱${p.price} [${p.stock}]</span>
+    <div><button class="small-btn edit-btn" onclick="editProduct('${p.barcode}')">Edit</button>
+    <button class="small-btn delete-btn" onclick="deleteProductByBarcode('${p.barcode}')">Del</button></div>`;
+    list.appendChild(div);
+  }); document.getElementById("productsModal").style.display="flex";
+}
+function deleteProductByBarcode(barcode){ let index=products.findIndex(p=>p.barcode===barcode); if(index!==-1 && confirm("Delete product?")){ products.splice(index,1); localStorage.setItem("products",JSON.stringify(products)); openProducts(); } }
+function editProduct(barcode){ let p=products.find(x=>x.barcode===barcode); if(!p) return; document.getElementById("barcode").value=p.barcode; document.getElementById("name").value=p.name; document.getElementById("price").value=p.price; document.getElementById("stock").value=p.stock; document.getElementById("productsModal").style.display="none"; document.getElementById("manualAddModal").style.display="flex";
+  document.getElementById("saveBtn").onclick=function(){ p.name=document.getElementById("name").value; p.price=parseFloat(document.getElementById("price").value)||0; p.stock=parseInt(document.getElementById("stock").value)||0; localStorage.setItem("products",JSON.stringify(products)); clearFields(); closeAdd(); openProducts(); document.getElementById("saveBtn").onclick=saveProduct; }; }
+function closeProducts(){ document.getElementById("productsModal").style.display="none"; }
+
+/* ADD PRODUCT */
+function openAddModal(){ document.getElementById("manualAddModal").style.display="flex"; }
+function closeAdd(){ document.getElementById("manualAddModal").style.display="none"; }
+function clearFields(){ barcode.value=""; name.value=""; price.value=""; stock.value=""; }
+function saveProduct(){ if(!barcode.value || !name.value){ alert("Fill barcode and name"); return; } let existing=products.find(p=>p.barcode===barcode.value); if(existing){ alert("Product already exists"); return; } products.push({barcode:barcode.value,name:name.value,price:parseFloat(price.value)||0,stock:parseInt(stock.value)||0}); localStorage.setItem("products",JSON.stringify(products)); clearFields(); closeAdd(); openProducts(); }
+function saveProducts(){ localStorage.setItem("products",JSON.stringify(products)); }
+
+/* CART MODAL */
+function openCart(){ document.getElementById("posCartModal").style.display="flex"; }
+function closeCart(){ document.getElementById("posCartModal").style.display="none"; }
+
+/* PRINT */
+function printReceipt(){ if(cart.length===0){ alert("Empty"); return; } let body=document.getElementById("receiptBody"); body.innerHTML=""; let total=0;
   cart.forEach(item=>{ total+=item.total; let tr=document.createElement("tr"); tr.innerHTML=`<td>${item.name}</td><td>${item.qty}</td><td>₱${item.total.toFixed(2)}</td>`; body.appendChild(tr); });
   document.getElementById("receiptTotal").innerText=total.toFixed(2);
   document.getElementById("receiptDate").innerText=new Date().toLocaleString();
