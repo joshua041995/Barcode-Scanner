@@ -10,10 +10,11 @@ body { margin:0; font-family:Arial; background:#f5f7fb; }
 button { padding:10px; margin:5px; border:none; border-radius:6px; font-size:1rem; cursor:pointer; }
 #manualAddBtn { position:absolute; bottom:15px; right:15px; font-size:22px; background:#4CAF50; color:white; border-radius:50%; width:55px; height:55px; }
 .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-.modal-content { background:#fff; padding:20px; border-radius:10px; width:90%; max-width:400px; }
+.modal-content { background:#fff; padding:20px; border-radius:10px; width:90%; max-width:400px; position:relative; }
 input { width:100%; padding:8px; margin:5px 0; }
 .product-row { border-bottom:1px solid #ccc; padding:5px; font-size:1rem; display:flex; justify-content:space-between; align-items:center; }
 #scanBarcodeBtn { position:absolute; right:5px; top:5px; }
+.close-btn { position:absolute; top:10px; right:10px; background:#ccc; border-radius:50%; width:25px; height:25px; font-weight:bold; line-height:25px; text-align:center; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -33,6 +34,7 @@ input { width:100%; padding:8px; margin:5px 0; }
 <!-- Manual Add Product Modal -->
 <div id="manualAddModal" class="modal">
 <div class="modal-content">
+<span class="close-btn" onclick="closeModal()">×</span>
 <h3>Add Product</h3>
 <div style="position:relative;">
 <input id="manualBarcodeInput" placeholder="Barcode">
@@ -42,22 +44,22 @@ input { width:100%; padding:8px; margin:5px 0; }
 <input id="manualPriceInput" placeholder="Price" type="number">
 <button onclick="saveProduct()">Save</button>
 <button onclick="clearFields()">Clear</button>
-<button onclick="closeModal()">Cancel</button>
 </div>
 </div>
 
 <!-- Products List Modal -->
 <div id="productsModal" class="modal">
 <div class="modal-content">
+<span class="close-btn" onclick="closeProducts()">×</span>
 <h3>Products</h3>
 <div id="productList"></div>
-<button onclick="closeProducts()">Close</button>
 </div>
 </div>
 
 <!-- POS Cart Modal -->
 <div id="posCartModal" class="modal">
 <div class="modal-content">
+<span class="close-btn" onclick="closeCart()">×</span>
 <h3>POS Cart</h3>
 <div id="cartItems"></div>
 <h3>Total: ₱<span id="cartTotal">0</span></h3>
@@ -76,7 +78,6 @@ let receipts = JSON.parse(localStorage.getItem('receipts')||'[]');
 let cart = [];
 let scanner;
 let mode="";
-let currentProduct=null;
 
 // Initialize scanner
 function initScanner(){
@@ -134,14 +135,20 @@ scanBarcodeBtn.onclick=()=>{
   startScan("manual");
 };
 
-// Products List
+// Products List with edit
 function openProducts(){
   let list=document.getElementById("productList");
   list.innerHTML="";
   products.forEach(p=>{
     let div=document.createElement("div");
     div.className="product-row";
-    div.innerHTML = `${p.name} ₱${p.price} <button onclick="deleteProduct('${p.barcode}')">Delete</button>`;
+    div.innerHTML = `
+      ${p.name} ₱${p.price} 
+      <div>
+        <button onclick="editProduct('${p.barcode}')">Edit</button>
+        <button onclick="deleteProduct('${p.barcode}')">Delete</button>
+      </div>
+    `;
     list.appendChild(div);
   });
   document.getElementById("productsModal").style.display="flex";
@@ -152,6 +159,15 @@ function deleteProduct(code){
     products = products.filter(p=>p.barcode!==code);
     localStorage.setItem("products",JSON.stringify(products));
     openProducts();
+  }
+}
+function editProduct(code){
+  let p = products.find(p=>p.barcode===code);
+  if(p){
+    manualBarcodeInput.value = p.barcode;
+    manualNameInput.value = p.name;
+    manualPriceInput.value = p.price;
+    document.getElementById("manualAddModal").style.display="flex";
   }
 }
 
