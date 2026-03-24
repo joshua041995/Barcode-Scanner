@@ -212,6 +212,11 @@ function editProduct(code){
     manualNameInput.value = p.name;
     manualPriceInput.value = p.price;
     editingBarcode = code; // mark as editing
+
+    // Hide products modal
+    closeProducts();
+
+    // Show Add Product modal
     document.getElementById("manualAddModal").style.display="flex";
   }
 }
