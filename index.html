@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>POS Scanner</title>
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 
 <style>
 body { margin:0; font-family:Arial; background:#f5f7fb; }
@@ -122,31 +119,43 @@ let scanner;
 let mode="";
 let lastScanTime=0;
 
-/* SOUND */
 function beep(){ document.getElementById("beepAudio").play(); }
 
-/* SCANNER */
+/* SCANNER FIXED */
 function startScan(m){
-  mode=m;
-  document.getElementById("posControls").style.display = (m==="pos")?"block":"none";
-  if(!scanner) scanner = new Html5Qrcode("scanner");
-  Html5Qrcode.getCameras().then(()=>{
-    scanner.start({facingMode:"environment"},{fps:10,qrbox:250},
-      code=>{
-        beep();
-        if(mode==="add"){ 
-          document.getElementById("barcode").value = code; 
-          document.getElementById("manualAddModal").style.display="flex"; 
-          scanner.stop(); 
-        }
-        if(mode==="pos") handlePOSScan(code);
-        if(mode==="search"){ 
-          let p=products.find(x=>x.barcode===code); 
-          alert(p?`${p.name} ₱${p.price} Stock:${p.stock}`:"Not found"); 
-          scanner.stop(); 
-        }
-      });
-  });
+  mode = m;
+  document.getElementById("posControls").style.display = (m === "pos") ? "block" : "none";
+
+  if(!scanner){
+    scanner = new Html5Qrcode("scanner");
+  } else {
+    scanner.stop().catch(()=>{});
+  }
+
+  Html5Qrcode.getCameras().then(cameras => {
+    if(cameras && cameras.length){
+      let cameraId = cameras[0].id;
+      scanner.start(
+        cameraId,
+        { fps: 10, qrbox: 250 },
+        code => {
+          beep();
+          if(mode==="add"){
+            document.getElementById("barcode").value = code; 
+            document.getElementById("manualAddModal").style.display="flex"; 
+            scanner.stop();
+          }
+          if(mode==="pos") handlePOSScan(code);
+          if(mode==="search"){
+            let p=products.find(x=>x.barcode===code); 
+            alert(p ? `${p.name} ₱${p.price} Stock:${p.stock}` : "Not found"); 
+            scanner.stop();
+          }
+        },
+        errorMessage => {}
+      ).catch(err => console.error(err));
+    } else { alert("No camera found"); }
+  }).catch(err => alert("Camera access error: "+err));
 }
 
 /* CAMERA BUTTON */
@@ -155,7 +164,7 @@ document.getElementById("scanBtn").onclick = function(){
   startScan("add"); 
 };
 
-/* POS */
+/* POS FUNCTIONS */
 function handlePOSScan(code){
   let now=Date.now(); 
   if(now-lastScanTime<2000) return; 
@@ -166,12 +175,10 @@ function handlePOSScan(code){
   let e=cart.find(i=>i.barcode===code);
   if(e){ e.qty++; e.total=e.qty*e.price; } 
   else cart.push({barcode:p.barcode,name:p.name,price:p.price,qty:1,total:p.price});
-  p.stock--; 
-  saveProducts(); 
-  updateCartUI();
+  p.stock--; saveProducts(); updateCartUI();
 }
 
-/* CART */
+/* CART FUNCTIONS */
 function updateCartUI(){
   let c=document.getElementById("cartItems"); c.innerHTML=""; let total=0;
   cart.forEach((item,i)=>{ total+=item.total;
@@ -206,7 +213,6 @@ function filterCartSearch(){
     resultsDiv.appendChild(div);
   });
 }
-
 function addToCartFromSearch(barcode){ 
   let p=products.find(x=>x.barcode===barcode); 
   if(!p){ alert("Product not found"); return; } 
@@ -229,9 +235,7 @@ function openProducts(){
     list.appendChild(div);
   }); document.getElementById("productsModal").style.display="flex";
 }
-
 function deleteProductByBarcode(barcode){ let index=products.findIndex(p=>p.barcode===barcode); if(index!==-1 && confirm("Delete product?")){ products.splice(index,1); localStorage.setItem("products",JSON.stringify(products)); openProducts(); } }
-
 function editProduct(barcode){ 
   let p=products.find(x=>x.barcode===barcode); if(!p) return; 
   document.getElementById("barcode").value=p.barcode; 
